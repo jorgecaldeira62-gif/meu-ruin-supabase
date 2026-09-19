@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Chat IA — MeuIDE</title>
+<link rel="manifest" href="manifest.json"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;height:100dvh;display:flex;flex-direction:column;overflow:hidden;}
+nav{display:flex;align-items:center;gap:8px;padding:0 12px;height:44px;background:#161b22;border-bottom:1px solid #30363d;flex-shrink:0;}
+.nav-title{font-weight:700;font-size:14px;color:#58a6ff;}
+.nav-link{color:#8b949e;font-size:12px;text-decoration:none;padding:4px 8px;border-radius:4px;}
+.nav-link:hover{color:#e6edf3;background:#21262d;}
+.nav-right{margin-left:auto;display:flex;gap:6px;align-items:center;}
+/* Chat */
+.chat-toolbar{display:flex;align-items:center;gap:6px;padding:6px 12px;background:#161b22;border-bottom:1px solid #30363d;flex-shrink:0;flex-wrap:wrap;}
+#messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;}
+.msg{padding:10px 12px;border-radius:8px;font-size:14px;line-height:1.6;max-width:85%;}
+.msg.user{background:#1c2128;border-left:3px solid #58a6ff;align-self:flex-end;}
+.msg.assistant{background:#161b22;border-left:3px solid #3fb950;}
+.msg.assistant pre{background:#0a0e14;border-radius:6px;padding:10px;overflow-x:auto;margin:8px 0;font-size:12px;}
+.msg.assistant code{font-family:monospace;font-size:13px;}
+.input-area{padding:10px;background:#161b22;border-top:1px solid #30363d;flex-shrink:0;}
+.input-row{display:flex;gap:8px;align-items:flex-end;}
+#prompt{flex:1;resize:none;padding:8px 12px;border-radius:8px;font-size:14px;max-height:120px;min-height:40px;background:#0a0e14;border:1px solid #30363d;color:#e6edf3;}
+#prompt:focus{outline:none;border-color:#58a6ff;}
+.btn{padding:7px 14px;border-radius:6px;font-size:13px;font-weight:600;border:none;cursor:pointer;}
+.btn-blue{background:#1f6feb;color:#fff;}
+.btn-gray{background:#21262d;color:#e6edf3;border:1px solid #30363d;font-size:12px;}
+.dot-anim span{animation:blink 1.2s infinite;display:inline-block;width:6px;height:6px;border-radius:50%;background:#3fb950;margin:0 2px;}
+.dot-anim span:nth-child(2){animation-delay:.2s;}
+.dot-anim span:nth-child(3){animation-delay:.4s;}
+@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+#tts-bar{display:none;align-items:center;gap:8px;padding:4px 12px;background:#0a0e14;border-top:1px solid #30363d;font-size:12px;color:#8b949e;}
+.mem-badge{font-size:11px;color:#8b949e;background:#21262d;padding:2px 8px;border-radius:4px;}
+select{background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:6px;padding:4px 8px;font-size:12px;}
+input[type=range]{accent-color:#58a6ff;}
+#toast{position:fixed;bottom:20px;right:20px;padding:8px 16px;border-radius:6px;font-size:13px;color:#fff;display:none;z-index:99;}
+/* Sidebar conversas */
+.sidebar{width:220px;border-right:1px solid #30363d;display:flex;flex-direction:column;background:#161b22;}
+.sidebar.hidden{display:none;}
+.sidebar-header{padding:8px;border-bottom:1px solid #30363d;display:flex;gap:6px;}
+.conv-item{padding:8px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #21262d;color:#8b949e;}
+.conv-item:hover,.conv-item.active{background:#1c2128;color:#e6edf3;}
+.main{display:flex;flex:1;overflow:hidden;}
+</style>
+</head>
+<body>
+<nav>
+  <span class="nav-title">💬 Chat IA</span>
+  <a class="nav-link" href="editor.html">Editor</a>
+  <a class="nav-link" href="playground.html">Playground</a>
+  <div class="nav-right">
+    <span id="mem-badge" class="mem-badge">0 msgs</span>
+    <button class="btn btn-gray" onclick="toggleSidebar()">☰</button>
+    <button class="btn btn-gray" onclick="openSettings()">⚙️ IA</button>
+    <button class="btn btn-gray" onclick="logout()">Sair</button>
+  </div>
+</nav>
+
+<div class="chat-toolbar">
+  <select id="ctx-size" onchange="updateCtxLabel()">
+    <option value="2000">2k tokens</option>
+    <option value="4000" selected>4k tokens</option>
+    <option value="8000">8k tokens</option>
+    <option value="16000">16k tokens</option>
+    <option value="32000">32k tokens</option>
+  </select>
+  <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;">
+    <input type="checkbox" id="use-tts" onchange="toggleTTS()" style="accent-color:#58a6ff;"> 🔊 Voz
+  </label>
+  <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;">
+    <input type="checkbox" id="use-memory" checked style="accent-color:#58a6ff;"> 🧠 Memória
+  </label>
+  <button class="btn btn-gray" onclick="newChat()">+ Nova</button>
+  <button class="btn btn-gray" onclick="clearChat()">🗑 Limpar</button>
+  <button class="btn btn-gray" onclick="exportChat()">⬇ Exportar</button>
+</div>
+
+<div class="main">
+  <div class="sidebar hidden" id="sidebar">
+    <div class="sidebar-header">
+      <span style="font-size:12px;font-weight:600;flex:1;">Conversas</span>
+      <button class="btn btn-gray" style="padding:3px 8px;font-size:11px;" onclick="newChat()">+</button>
+    </div>
+    <div id="conv-list" style="flex:1;overflow-y:auto;"></div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+    <div id="messages"></div>
+
+    <div id="tts-bar">
+      <span>Velocidade:</span>
+      <input type="range" id="tts-speed" min="0.5" max="2" step="0.05" value="1.1" oninput="document.getElementById('tts-lbl').textContent=parseFloat(this.value).toFixed(2)+'x'">
+      <span id="tts-lbl">1.10x</span>
+      <button onclick="stopTTS()" style="background:#da3633;color:#fff;border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:11px;margin-left:auto;">⏹ Parar</button>
+    </div>
+
+    <div class="input-area">
+      <div class="input-row">
+        <textarea id="prompt" rows="1" placeholder="Digite sua mensagem... (Ctrl+Enter para enviar)" onkeydown="if(event.ctrlKey&&event.key==='Enter'){sendMsg();event.preventDefault();}"></textarea>
+        <button class="btn btn-blue" onclick="sendMsg()" id="send-btn">▶</button>
+      </div>
+      <div style="font-size:11px;color:#8b949e;margin-top:4px;">Ctrl+Enter envia · <span id="ai-info">IA não configurada</span></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Modal Configurações -->
+<div id="settings-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:10px;padding:24px;width:90%;max-width:460px;max-height:80vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 style="font-size:15px;">⚙️ Chaves de IA</h2>
+      <button onclick="closeSettings()" style="background:none;border:none;color:#8b949e;font-size:18px;cursor:pointer;">✕</button>
+    </div>
+    <p style="font-size:11px;color:#8b949e;margin-bottom:12px;">Auto-detecção: AIza→Gemini (grátis) · gsk_→Groq (grátis) · sk-→OpenAI · sk-or-→OpenRouter</p>
+    <div id="key-slots"></div>
+    <button onclick="addSlot()" class="btn btn-gray" style="width:100%;margin-top:8px;font-size:12px;">+ Adicionar chave</button>
+    <div style="margin-top:16px;border-top:1px solid #30363d;padding-top:12px;">
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px;">GitHub (para enviar projetos)</div>
+      <div style="display:flex;gap:6px;margin-bottom:6px;">
+        <input type="password" id="gh-token" placeholder="Token (ghp_...)" style="flex:1;background:#0a0e14;border:1px solid #30363d;color:#e6edf3;border-radius:6px;padding:6px;font-size:12px;">
+      </div>
+      <input type="text" id="gh-repo" placeholder="usuario/repositorio" style="width:100%;background:#0a0e14;border:1px solid #30363d;color:#e6edf3;border-radius:6px;padding:6px;font-size:12px;margin-bottom:6px;">
+      <button onclick="saveGitHub()" class="btn btn-blue" style="font-size:12px;padding:6px 12px;">Salvar GitHub</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+// ── Supabase ──────────────────────────────────────────
+const sbUrl = localStorage.getItem('sb_url');
+const sbKey = localStorage.getItem('sb_key');
+let sb = null;
+if (sbUrl && sbKey) sb = createClient(sbUrl, sbKey);
+
+let user = null;
+let currentChatId = null;
+let messages = [];
+let isBusy = false;
+
+// ── Auth ──────────────────────────────────────────────
+async function init() {
+  if (sb) {
+    const { data } = await sb.auth.getUser();
+    user = data?.user || null;
+    if (!user) { window.location.href = 'index.html'; return; }
+  }
+  loadAIInfo();
+  loadSlots();
+  if (sb) await loadConversations();
+  const lastId = localStorage.getItem('last_chat');
+  if (lastId) await loadChat(lastId);
+}
+
+window.logout = async () => { if (sb) await sb.auth.signOut(); window.location.href = 'index.html'; };
+
+// ── AI ────────────────────────────────────────────────
+function detectProvider(key) {
+  if (!key) return null;
+  if (key.startsWith('AIza'))   return { name:'Gemini',     base:'https://generativelanguage.googleapis.com/v1beta/openai', model:'gemini-2.0-flash' };
+  if (key.startsWith('gsk_'))   return { name:'Groq',       base:'https://api.groq.com/openai/v1', model:'llama-3.3-70b-versatile' };
+  if (key.startsWith('sk-or-')) return { name:'OpenRouter', base:'https://openrouter.ai/api/v1', model:'anthropic/claude-haiku' };
+  if (key.startsWith('xai-'))   return { name:'Grok',       base:'https://api.x.ai/v1', model:'grok-3-mini' };
+  if (key.startsWith('sk-'))    return { name:'OpenAI',     base:'https://api.openai.com/v1', model:'gpt-4o-mini' };
+  return null;
+}
+
+function getActiveKey() {
+  const slots = JSON.parse(localStorage.getItem('ai_keys') || '[]');
+  return slots.find(s => s.active)?.key || slots[0]?.key || null;
+}
+
+function loadAIInfo() {
+  const key = getActiveKey();
+  const prov = key ? detectProvider(key) : null;
+  document.getElementById('ai-info').textContent = prov ? `${prov.name} · ${prov.model}` : 'IA não configurada — clique em ⚙️ IA';
+}
+
+async function callAI(msgs) {
+  const key = getActiveKey();
+  if (!key) throw new Error('Nenhuma chave configurada!');
+  const prov = detectProvider(key);
+  if (!prov) throw new Error('Chave inválida');
+  const maxTok = parseInt(document.getElementById('ctx-size').value);
+  const r = await fetch(`${prov.base}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({ model: prov.model, messages: msgs, max_tokens: Math.min(maxTok, 8192) })
+  });
+  const d = await r.json();
+  if (d.error) throw new Error(d.error.message || JSON.stringify(d.error));
+  return d.choices?.[0]?.message?.content || '';
+}
+
+// ── Mensagens ─────────────────────────────────────────
+function addMsgEl(role, content, id) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  if (id) div.id = id;
+  div.innerHTML = role === 'user'
+    ? `<div style="font-size:11px;color:#58a6ff;margin-bottom:4px;">👤 Você</div><div style="white-space:pre-wrap;">${esc(content)}</div>`
+    : `<div style="font-size:11px;color:#3fb950;margin-bottom:4px;">🤖 IA</div><div class="ai-content">${md(content)}</div>`;
+  document.getElementById('messages').appendChild(div);
+  document.getElementById('messages').scrollTop = 99999;
+  return div;
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function md(s) {
+  return String(s)
+    .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+    .replace(/`([^`]+)`/g, '<code style="background:#0a0e14;padding:1px 4px;border-radius:3px;">$1</code>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>');
+}
+
+window.sendMsg = async () => {
+  if (isBusy) return;
+  const input = document.getElementById('prompt');
+  const text = input.value.trim();
+  if (!text) return;
+  const key = getActiveKey();
+  if (!key) { toast('Configure uma chave de IA em ⚙️ IA', 'err'); return; }
+  input.value = '';
+  input.style.height = 'auto';
+
+  if (!currentChatId) await newChat(false);
+
+  const userMsg = { role: 'user', content: text };
+  messages.push(userMsg);
+  addMsgEl('user', text);
+  if (sb && currentChatId) await sb.from('messages').insert({ chat_id: currentChatId, role: 'user', content: text });
+
+  isBusy = true;
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('send-btn').textContent = '…';
+
+  const thinking = addMsgEl('assistant', '', 'thinking');
+  thinking.querySelector('.ai-content').innerHTML = '<span class="dot-anim"><span></span><span></span><span></span></span>';
+
+  try {
+    const useMemory = document.getElementById('use-memory').checked;
+    const maxTok = parseInt(document.getElementById('ctx-size').value);
+    const memMsgs = useMemory ? messages.slice(-Math.floor(maxTok / 200)) : [userMsg];
+    const reply = await callAI(memMsgs);
+
+    thinking.querySelector('.ai-content').innerHTML = md(reply);
+    thinking.id = '';
+    const aiMsg = { role: 'assistant', content: reply };
+    messages.push(aiMsg);
+
+    if (sb && currentChatId) await sb.from('messages').insert({ chat_id: currentChatId, role: 'assistant', content: reply });
+    document.getElementById('mem-badge').textContent = messages.length + ' msgs';
+
+    if (document.getElementById('use-tts').checked) speakText(reply);
+  } catch(e) {
+    thinking.querySelector('.ai-content').innerHTML = `<span style="color:#f85149;">Erro: ${esc(e.message)}</span>`;
+    thinking.id = '';
+  }
+
+  isBusy = false;
+  document.getElementById('send-btn').disabled = false;
+  document.getElementById('send-btn').textContent = '▶';
+};
+
+// ── Conversas ─────────────────────────────────────────
+window.newChat = async (redirect = true) => {
+  messages = [];
+  document.getElementById('messages').innerHTML = '';
+  document.getElementById('mem-badge').textContent = '0 msgs';
+
+  if (sb && user) {
+    const { data } = await sb.from('chats').insert({ user_id: user.id, title: 'Nova conversa' }).select().single();
+    currentChatId = data?.id;
+    if (currentChatId) localStorage.setItem('last_chat', currentChatId);
+    await loadConversations();
+  }
+};
+
+async function loadChat(chatId) {
+  if (!sb) return;
+  currentChatId = chatId;
+  localStorage.setItem('last_chat', chatId);
+  const { data } = await sb.from('messages').select('*').eq('chat_id', chatId).order('created_at');
+  messages = data || [];
+  document.getElementById('messages').innerHTML = '';
+  messages.forEach(m => addMsgEl(m.role, m.content));
+  document.getElementById('mem-badge').textContent = messages.length + ' msgs';
+  document.querySelectorAll('.conv-item').forEach(el => el.classList.toggle('active', el.dataset.id === chatId));
+}
+
+async function loadConversations() {
+  if (!sb || !user) return;
+  const { data } = await sb.from('chats').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(30);
+  const list = document.getElementById('conv-list');
+  list.innerHTML = (data || []).map(c => `
+    <div class="conv-item ${c.id === currentChatId ? 'active' : ''}" data-id="${c.id}" onclick="loadChatById('${c.id}')">
+      💬 ${esc(c.title || 'Conversa')}
+      <div style="font-size:10px;color:#8b949e;">${new Date(c.created_at).toLocaleDateString('pt-BR')}</div>
+    </div>
+  `).join('');
+}
+
+window.loadChatById = (id) => loadChat(id);
+
+window.clearChat = () => {
+  messages = []; currentChatId = null;
+  document.getElementById('messages').innerHTML = '';
+  document.getElementById('mem-badge').textContent = '0 msgs';
+};
+
+window.exportChat = () => {
+  const txt = messages.map(m => `[${m.role.toUpperCase()}]\n${m.content}`).join('\n\n---\n\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' }));
+  a.download = `chat-${Date.now()}.txt`; a.click();
+};
+
+// ── TTS ───────────────────────────────────────────────
+let ttsUtter = null;
+window.toggleTTS = () => {
+  document.getElementById('tts-bar').style.display = document.getElementById('use-tts').checked ? 'flex' : 'none';
+};
+function speakText(text) {
+  if (!window.speechSynthesis) return;
+  stopTTS();
+  const clean = text.replace(/```[\s\S]*?```/g,'').replace(/[*_`#]/g,'').trim().slice(0,3000);
+  ttsUtter = new SpeechSynthesisUtterance(clean);
+  ttsUtter.lang = 'pt-BR';
+  ttsUtter.rate = parseFloat(document.getElementById('tts-speed').value);
+  window.speechSynthesis.speak(ttsUtter);
+}
+window.stopTTS = () => window.speechSynthesis?.cancel();
+
+// ── Sidebar ───────────────────────────────────────────
+window.toggleSidebar = () => document.getElementById('sidebar').classList.toggle('hidden');
+
+// ── Configurações ─────────────────────────────────────
+window.openSettings = () => { loadSlots(); document.getElementById('settings-modal').style.display = 'flex'; };
+window.closeSettings = () => { document.getElementById('settings-modal').style.display = 'none'; loadAIInfo(); };
+
+function loadSlots() {
+  const slots = JSON.parse(localStorage.getItem('ai_keys') || '[]');
+  const container = document.getElementById('key-slots');
+  if (!slots.length) { container.innerHTML = '<p style="font-size:12px;color:#8b949e;margin-bottom:8px;">Nenhuma chave. Adicione abaixo.</p>'; return; }
+  container.innerHTML = slots.map((s, i) => `
+    <div style="background:#0a0e14;border:1px solid #30363d;border-radius:6px;padding:10px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        <input type="checkbox" ${s.active?'checked':''} onchange="toggleSlot(${i})" style="accent-color:#58a6ff;">
+        <span style="font-size:12px;color:${s.active?'#3fb950':'#8b949e'};">${s.active?'✅ Ativa':'Inativa'}</span>
+        <span style="font-size:11px;color:#8b949e;margin-left:auto;">${detectProviderName(s.key)}</span>
+        <button onclick="removeSlot(${i})" style="background:none;border:none;color:#f85149;cursor:pointer;font-size:13px;">✕</button>
+      </div>
+      <input type="password" value="${s.key}" onchange="updateSlot(${i},this.value)" style="width:100%;background:#161b22;border:1px solid #30363d;color:#e6edf3;border-radius:4px;padding:5px 8px;font-size:12px;font-family:monospace;">
+    </div>
+  `).join('');
+  const ghToken = localStorage.getItem('gh_token') || '';
+  const ghRepo  = localStorage.getItem('gh_repo')  || '';
+  if (ghToken) document.getElementById('gh-token').placeholder = '✅ Token salvo';
+  document.getElementById('gh-repo').value = ghRepo;
+}
+
+function detectProviderName(key) {
+  if (!key) return '—';
+  if (key.startsWith('AIza'))   return 'Gemini';
+  if (key.startsWith('gsk_'))   return 'Groq';
+  if (key.startsWith('sk-ant-'))return 'Claude';
+  if (key.startsWith('sk-or-')) return 'OpenRouter';
+  if (key.startsWith('xai-'))   return 'Grok';
+  if (key.startsWith('sk-'))    return 'OpenAI';
+  return '?';
+}
+
+window.addSlot = () => {
+  const slots = JSON.parse(localStorage.getItem('ai_keys') || '[]');
+  slots.push({ key: '', active: !slots.length });
+  localStorage.setItem('ai_keys', JSON.stringify(slots));
+  loadSlots();
+};
+window.removeSlot = (i) => {
+  const slots = JSON.parse(localStorage.getItem('ai_keys') || '[]');
+  slots.splice(i, 1);
+  localStorage.setItem('ai_keys', JSON.stringify(slots));
+  loadSlots();
+};
+window.toggleSlot = (i) => {
+  const slots = JSON.parse(localStorage.getItem('ai_keys') || '[]');
+  slots.forEach((s,j) => s.active = j === i);
+  localStorage.setItem('ai_keys', JSON.stringify(slots));
+  loadSlots();
+};
+window.updateSlot = (i, val) => {
+  const slots = JSON.parse(localStorage.getItem('ai_keys') || '[]');
+  slots[i].key = val.trim();
+  localStorage.setItem('ai_keys', JSON.stringify(slots));
+};
+window.saveGitHub = () => {
+  const token = document.getElementById('gh-token').value.trim();
+  const repo  = document.getElementById('gh-repo').value.trim();
+  if (token) localStorage.setItem('gh_token', token);
+  if (repo)  localStorage.setItem('gh_repo', repo);
+  toast('GitHub salvo!');
+};
+
+window.updateCtxLabel = () => {};
+
+function toast(msg, type = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = type==='err'?'#da3633':'#238636';
+  t.style.display = 'block';
+  setTimeout(()=>t.style.display='none', 3000);
+}
+
+init();
+</script>
+</body>
+</html>
