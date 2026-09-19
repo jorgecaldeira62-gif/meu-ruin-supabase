@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Editor — MeuIDE</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;height:100dvh;display:flex;flex-direction:column;overflow:hidden;}
+nav{display:flex;align-items:center;gap:8px;padding:0 12px;height:44px;background:#161b22;border-bottom:1px solid #30363d;flex-shrink:0;}
+.nav-title{font-weight:700;font-size:14px;color:#58a6ff;}
+.nav-link{color:#8b949e;font-size:12px;text-decoration:none;padding:4px 8px;border-radius:4px;}
+.nav-link:hover{color:#e6edf3;background:#21262d;}
+.nav-right{margin-left:auto;display:flex;gap:6px;align-items:center;}
+.btn{padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;border:none;cursor:pointer;}
+.btn-blue{background:#1f6feb;color:#fff;}
+.btn-gray{background:#21262d;color:#e6edf3;border:1px solid #30363d;}
+.btn-green{background:#238636;color:#fff;}
+.toolbar{display:flex;align-items:center;gap:6px;padding:5px 10px;background:#161b22;border-bottom:1px solid #30363d;flex-shrink:0;flex-wrap:wrap;}
+/* Layout */
+.main{flex:1;display:flex;overflow:hidden;}
+/* File Tree */
+.tree{width:220px;border-right:1px solid #30363d;display:flex;flex-direction:column;background:#161b22;flex-shrink:0;}
+.tree.hidden{display:none;}
+.tree-header{padding:6px 8px;border-bottom:1px solid #30363d;display:flex;gap:4px;align-items:center;font-size:12px;font-weight:600;}
+.tree-header span{flex:1;}
+#file-tree{flex:1;overflow-y:auto;padding:4px 0;}
+.tree-item{display:flex;align-items:center;gap:4px;padding:4px 8px;cursor:pointer;font-size:12px;border-radius:4px;margin:1px 4px;}
+.tree-item:hover,.tree-item.active{background:#1c2128;}
+.tree-item .del-btn{margin-left:auto;background:none;border:none;color:#f85149;cursor:pointer;opacity:0;font-size:12px;padding:0 2px;}
+.tree-item:hover .del-btn{opacity:1;}
+/* Editor */
+.editor-area{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.editor-top{display:flex;align-items:center;gap:6px;padding:5px 8px;background:#161b22;border-bottom:1px solid #30363d;flex-shrink:0;font-size:12px;}
+.editor-wrap{flex:1;display:flex;overflow:hidden;}
+#code-editor{flex:1;background:#0a0e14;color:#e6edf3;border:none;resize:none;padding:12px;font-family:'Courier New',monospace;font-size:13px;line-height:1.6;outline:none;tab-size:2;}
+/* Preview */
+.preview-pane{width:40%;border-left:1px solid #30363d;display:flex;flex-direction:column;}
+.preview-pane.hidden{display:none;}
+.preview-pane.expanded{width:55%;}
+.pane-header{padding:4px 8px;font-size:11px;color:#8b949e;background:#0a0e14;border-bottom:1px solid #30363d;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;}
+iframe{flex:1;border:none;background:#fff;}
+/* AI Panel */
+.ai-pane{width:280px;border-left:1px solid #30363d;display:flex;flex-direction:column;}
+.ai-pane.hidden{display:none;}
+#ai-msgs{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;}
+.ai-msg{padding:7px 9px;border-radius:6px;font-size:12px;line-height:1.5;}
+.ai-msg.user{background:#1c2128;border-left:2px solid #58a6ff;}
+.ai-msg.assistant{background:#161b22;border-left:2px solid #3fb950;}
+.ai-input{padding:8px;border-top:1px solid #30363d;}
+#ai-prompt{width:100%;background:#0a0e14;border:1px solid #30363d;color:#e6edf3;border-radius:6px;padding:7px;font-size:12px;resize:none;font-family:inherit;}
+.dot-anim span{animation:blink 1.2s infinite;display:inline-block;width:5px;height:5px;border-radius:50%;background:#3fb950;margin:0 1px;}
+.dot-anim span:nth-child(2){animation-delay:.2s;}.dot-anim span:nth-child(3){animation-delay:.4s;}
+@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+#toast{position:fixed;bottom:20px;right:20px;padding:8px 16px;border-radius:6px;font-size:13px;color:#fff;display:none;z-index:99;}
+.project-tab{padding:4px 10px;font-size:11px;background:#21262d;border:1px solid #30363d;border-radius:4px;cursor:pointer;color:#8b949e;}
+.project-tab.active{background:#1f6feb;color:#fff;border-color:#1f6feb;}
+</style>
+</head>
+<body>
+<nav>
+  <span class="nav-title">💻 Editor</span>
+  <a class="nav-link" href="chat.html">Chat IA</a>
+  <a class="nav-link" href="playground.html">Playground</a>
+  <div class="nav-right">
+    <button class="btn btn-gray" onclick="logout()">Sair</button>
+  </div>
+</nav>
+
+<div class="toolbar">
+  <button class="btn btn-gray" onclick="toggleTree()">☰ Árvore</button>
+  <button class="btn btn-gray" onclick="newFile()">+ Arquivo</button>
+  <button class="btn btn-gray" onclick="newFolder()">+ Pasta</button>
+  <span style="color:#30363d;">|</span>
+  <button class="btn btn-gray" onclick="importZip()">⬆ ZIP</button>
+  <button class="btn btn-green" onclick="exportZip()">⬇ ZIP</button>
+  <button class="btn btn-gray" onclick="pushToGitHub()">🔀 GitHub</button>
+  <span style="color:#30363d;">|</span>
+  <button class="btn btn-blue" onclick="saveFile()">💾 Salvar</button>
+  <button class="btn btn-gray" onclick="saveProject()">💾 Projeto</button>
+  <span style="color:#30363d;">|</span>
+  <button class="btn btn-gray" onclick="togglePreview()">👁 Preview</button>
+  <button class="btn btn-gray" onclick="toggleAI()">🤖 IA</button>
+  <input type="file" id="zip-input" accept=".zip" style="display:none" onchange="handleZip(event)">
+</div>
+
+<!-- Projetos -->
+<div style="display:flex;gap:4px;padding:4px 10px;background:#0a0e14;border-bottom:1px solid #30363d;flex-shrink:0;overflow-x:auto;">
+  <div id="project-tabs" style="display:flex;gap:4px;"></div>
+  <button onclick="newProject()" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;white-space:nowrap;">+ Novo Projeto</button>
+</div>
+
+<div class="main">
+  <!-- File Tree -->
+  <div class="tree" id="tree">
+    <div class="tree-header">
+      <span id="tree-project-name">Sem projeto</span>
+    </div>
+    <div id="file-tree"></div>
+  </div>
+
+  <!-- Editor -->
+  <div class="editor-area">
+    <div class="editor-top">
+      <span style="color:#58a6ff;font-family:monospace;" id="current-file">sem arquivo</span>
+      <span style="color:#8b949e;" id="file-info"></span>
+    </div>
+    <div class="editor-wrap">
+      <textarea id="code-editor" spellcheck="false" oninput="onEdit()" onkeydown="handleTab(event)" placeholder="Abra ou crie um arquivo..."></textarea>
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview-pane" id="preview-pane">
+    <div class="pane-header">
+      <span>👁 Preview</span>
+      <button onclick="expandPreview()" style="background:none;border:none;color:#8b949e;cursor:pointer;font-size:11px;">↔</button>
+    </div>
+    <iframe id="preview-frame" sandbox="allow-scripts allow-modals allow-forms"></iframe>
+  </div>
+
+  <!-- AI Pane -->
+  <div class="ai-pane hidden" id="ai-pane">
+    <div class="pane-header">
+      <span>🤖 Assistente</span>
+      <button onclick="clearAI()" style="background:none;border:none;color:#8b949e;cursor:pointer;font-size:11px;">🗑</button>
+    </div>
+    <div id="ai-msgs"></div>
+    <div class="ai-input">
+      <textarea id="ai-prompt" rows="3" placeholder="Pergunte sobre o código... (Ctrl+Enter)" onkeydown="if(event.ctrlKey&&event.key==='Enter'){sendAI();event.preventDefault();}"></textarea>
+      <div style="display:flex;justify-content:flex-end;margin-top:4px;">
+        <button class="btn btn-blue" onclick="sendAI()" style="font-size:11px;padding:4px 10px;">▶ Enviar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+const sbUrl = localStorage.getItem('sb_url');
+const sbKey = localStorage.getItem('sb_key');
+let sb = null;
+if (sbUrl && sbKey) sb = createClient(sbUrl, sbKey);
+
+let user = null;
+let projects = [];
+let currentProject = null;
+let files = {};
+let currentFile = null;
+let previewTimer = null;
+let aiMsgs = [];
+
+// ── Init ──────────────────────────────────────────────
+async function init() {
+  if (sb) {
+    const { data } = await sb.auth.getUser();
+    user = data?.user || null;
+    if (!user) { window.location.href = 'index.html'; return; }
+    await loadProjects();
+  } else {
+    // Modo local
+    const local = JSON.parse(localStorage.getItem('local_files') || '{}');
+    files = local;
+    renderTree();
+  }
+}
+
+window.logout = async () => { if (sb) await sb.auth.signOut(); window.location.href = 'index.html'; };
+
+// ── Projetos ──────────────────────────────────────────
+async function loadProjects() {
+  if (!sb || !user) return;
+  const { data } = await sb.from('projects').select('*').eq('user_id', user.id).order('updated_at', { ascending: false });
+  projects = data || [];
+  renderProjectTabs();
+  if (projects.length) await selectProject(projects[0]);
+}
+
+function renderProjectTabs() {
+  document.getElementById('project-tabs').innerHTML = projects.map(p => `
+    <div class="project-tab ${currentProject?.id === p.id ? 'active' : ''}" onclick="selectProjectById('${p.id}')">${esc(p.name)}</div>
+  `).join('');
+}
+
+window.selectProjectById = (id) => { const p = projects.find(x => x.id === id); if (p) selectProject(p); };
+
+async function selectProject(p) {
+  currentProject = p;
+  currentFile = null;
+  files = {};
+  document.getElementById('tree-project-name').textContent = p.name;
+  document.getElementById('code-editor').value = '';
+  document.getElementById('current-file').textContent = 'sem arquivo';
+  renderProjectTabs();
+
+  if (sb) {
+    const { data } = await sb.from('files').select('*').eq('project_id', p.id);
+    (data || []).forEach(f => { files[f.path] = f.content; });
+  }
+  renderTree();
+}
+
+window.newProject = async () => {
+  const name = prompt('Nome do projeto:', 'Meu Projeto');
+  if (!name?.trim()) return;
+  if (sb && user) {
+    const { data } = await sb.from('projects').insert({ user_id: user.id, name: name.trim() }).select().single();
+    if (data) { projects.unshift(data); await selectProject(data); renderProjectTabs(); }
+  } else {
+    toast('Configure o Supabase para salvar projetos.', 'err');
+  }
+};
+
+// ── Árvore de arquivos ────────────────────────────────
+function renderTree() {
+  const fileList = Object.keys(files).sort();
+  const tree = document.getElementById('file-tree');
+  tree.innerHTML = fileList.length ? fileList.map(f => `
+    <div class="tree-item ${f === currentFile ? 'active' : ''}" onclick="openFile('${esc(f)}')">
+      <span>${fileIcon(f)}</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;">${esc(f)}</span>
+      <button class="del-btn" onclick="event.stopPropagation();deleteFile('${esc(f)}')">✕</button>
+    </div>
+  `).join('') : '<p style="padding:12px;font-size:12px;color:#8b949e;">Nenhum arquivo. Crie ou importe um ZIP.</p>';
+}
+
+function fileIcon(name) {
+  const ext = name.split('.').pop()?.toLowerCase() || '';
+  const icons = { html:'🌐',css:'🎨',js:'📜',ts:'📘',jsx:'⚛',tsx:'⚛',json:'📋',md:'📝',py:'🐍',txt:'📄',svg:'🖼' };
+  return icons[ext] || '📄';
+}
+
+window.openFile = (name) => {
+  if (currentFile) files[currentFile] = document.getElementById('code-editor').value;
+  currentFile = name;
+  document.getElementById('code-editor').value = files[name] || '';
+  document.getElementById('current-file').textContent = name;
+  document.getElementById('file-info').textContent = (files[name] || '').split('\n').length + ' linhas';
+  renderTree();
+  if (name.endsWith('.html')) schedulePreview();
+};
+
+window.newFile = () => {
+  const name = prompt('Nome do arquivo:', 'novo.html');
+  if (!name?.trim()) return;
+  files[name.trim()] = '';
+  renderTree();
+  openFile(name.trim());
+};
+
+window.newFolder = () => {
+  const folder = prompt('Nome da pasta:','componentes');
+  if (!folder?.trim()) return;
+  const name = folder.trim() + '/index.html';
+  files[name] = '';
+  renderTree();
+  openFile(name);
+};
+
+window.deleteFile = (name) => {
+  if (!confirm(`Deletar "${name}"?`)) return;
+  delete files[name];
+  if (currentFile === name) { currentFile = null; document.getElementById('code-editor').value = ''; }
+  renderTree();
+};
+
+window.onEdit = () => {
+  if (currentFile) files[currentFile] = document.getElementById('code-editor').value;
+  document.getElementById('file-info').textContent = (files[currentFile] || '').split('\n').length + ' linhas';
+  if (currentFile?.endsWith('.html')) schedulePreview();
+};
+
+window.handleTab = (e) => {
+  if (e.key !== 'Tab') return;
+  e.preventDefault();
+  const t = e.target, s = t.selectionStart;
+  t.value = t.value.substring(0,s) + '  ' + t.value.substring(t.selectionEnd);
+  t.selectionStart = t.selectionEnd = s + 2;
+  onEdit();
+};
+
+// ── Salvar ────────────────────────────────────────────
+window.saveFile = async () => {
+  if (!currentFile) { toast('Abra um arquivo primeiro.', 'err'); return; }
+  if (currentFile) files[currentFile] = document.getElementById('code-editor').value;
+  if (sb && currentProject) {
+    const { error } = await sb.from('files').upsert(
+      { project_id: currentProject.id, path: currentFile, content: files[currentFile], updated_at: new Date().toISOString() },
+      { onConflict: 'project_id,path' }
+    );
+    if (error) { toast('Erro: ' + error.message, 'err'); return; }
+    toast('✅ Salvo!');
+  } else {
+    localStorage.setItem('local_files', JSON.stringify(files));
+    toast('✅ Salvo localmente!');
+  }
+};
+
+window.saveProject = async () => {
+  if (currentFile) files[currentFile] = document.getElementById('code-editor').value;
+  if (sb && currentProject) {
+    const entries = Object.entries(files);
+    for (const [path, content] of entries) {
+      await sb.from('files').upsert(
+        { project_id: currentProject.id, path, content, updated_at: new Date().toISOString() },
+        { onConflict: 'project_id,path' }
+      );
+    }
+    await sb.from('projects').update({ updated_at: new Date().toISOString() }).eq('id', currentProject.id);
+    toast(`✅ Projeto salvo! (${entries.length} arquivos)`);
+  } else {
+    localStorage.setItem('local_files', JSON.stringify(files));
+    toast('✅ Salvo localmente!');
+  }
+};
+
+// ── ZIP ───────────────────────────────────────────────
+window.importZip = () => document.getElementById('zip-input').click();
+
+window.handleZip = async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  if (!window.JSZip) { toast('JSZip não carregado.', 'err'); return; }
+  const zip = await JSZip.loadAsync(file);
+  const textExts = new Set(['html','css','js','ts','jsx','tsx','json','md','txt','py','svg','xml','sh','bat','yaml','yml','toml','env']);
+  for (const [name, entry] of Object.entries(zip.files)) {
+    if (entry.dir) continue;
+    const ext = name.split('.').pop()?.toLowerCase() || '';
+    if (!textExts.has(ext)) continue;
+    // Remove prefixo de pasta
+    const parts = name.split('/');
+    const path = parts.length > 1 ? parts.slice(1).join('/') : name;
+    if (!path) continue;
+    files[path] = await entry.async('text');
+  }
+  renderTree();
+  if (Object.keys(files).length) openFile(Object.keys(files)[0]);
+  toast(`✅ ${Object.keys(files).length} arquivos importados`);
+  e.target.value = '';
+};
+
+window.exportZip = async () => {
+  if (currentFile) files[currentFile] = document.getElementById('code-editor').value;
+  if (!window.JSZip) { toast('JSZip não carregado.', 'err'); return; }
+  const zip = new JSZip();
+  const projectName = currentProject?.name || 'projeto';
+  for (const [path, content] of Object.entries(files)) zip.file(path, content);
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${projectName}.zip`; a.click();
+  toast('✅ ZIP baixado!');
+};
+
+// ── GitHub ────────────────────────────────────────────
+window.pushToGitHub = async () => {
+  const token = localStorage.getItem('gh_token');
+  const repo = localStorage.getItem('gh_repo');
+  if (!token || !repo) { toast('Configure GitHub no Chat → ⚙️ IA', 'err'); return; }
+  if (currentFile) files[currentFile] = document.getElementById('code-editor').value;
+  if (!Object.keys(files).length) { toast('Nenhum arquivo para enviar.', 'err'); return; }
+
+  toast('Enviando para GitHub...');
+  let ok = 0;
+  for (const [path, content] of Object.entries(files)) {
+    try {
+      const existing = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+        headers: { 'Authorization': `token ${token}` }
+      });
+      const sha = existing.ok ? (await existing.json()).sha : undefined;
+      await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: `Update ${path}`, content: btoa(unescape(encodeURIComponent(content))), sha })
+      });
+      ok++;
+    } catch {}
+  }
+  toast(`✅ ${ok} arquivo(s) enviados para GitHub!`);
+};
+
+// ── Preview ───────────────────────────────────────────
+function schedulePreview() { clearTimeout(previewTimer); previewTimer = setTimeout(updatePreview, 600); }
+
+function updatePreview() {
+  const content = files[currentFile] || '';
+  const blob = new Blob([content], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const frame = document.getElementById('preview-frame');
+  if (frame._prev) URL.revokeObjectURL(frame._prev);
+  frame._prev = url; frame.src = url;
+}
+
+window.togglePreview = () => document.getElementById('preview-pane').classList.toggle('hidden');
+window.expandPreview = () => document.getElementById('preview-pane').classList.toggle('expanded');
+
+// ── AI ────────────────────────────────────────────────
+function detectProvider(key) {
+  if (!key) return null;
+  if (key.startsWith('AIza'))   return { base:'https://generativelanguage.googleapis.com/v1beta/openai', model:'gemini-2.0-flash' };
+  if (key.startsWith('gsk_'))   return { base:'https://api.groq.com/openai/v1', model:'llama-3.3-70b-versatile' };
+  if (key.startsWith('sk-or-')) return { base:'https://openrouter.ai/api/v1', model:'anthropic/claude-haiku' };
+  if (key.startsWith('sk-'))    return { base:'https://api.openai.com/v1', model:'gpt-4o-mini' };
+  return null;
+}
+
+window.toggleAI = () => document.getElementById('ai-pane').classList.toggle('hidden');
+window.clearAI = () => { aiMsgs = []; document.getElementById('ai-msgs').innerHTML = ''; };
+
+window.sendAI = async () => {
+  const slots = JSON.parse(localStorage.getItem('ai_keys') || '[]');
+  const key = slots.find(s=>s.active)?.key || slots[0]?.key;
+  if (!key) { toast('Configure IA no Chat → ⚙️ IA', 'err'); return; }
+  const prov = detectProvider(key);
+  if (!prov) { toast('Chave inválida', 'err'); return; }
+
+  const input = document.getElementById('ai-prompt');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  const code = files[currentFile] || '';
+  const system = `Você é um assistente de programação. Arquivo atual: ${currentFile || 'nenhum'}\n\nCódigo:\n\`\`\`\n${code.slice(0,3000)}\n\`\`\``;
+
+  aiMsgs.push({ role: 'user', content: text });
+  addAIMsg('user', text);
+
+  const thinking = addAIMsg('assistant', '');
+  thinking.querySelector('.ai-content').innerHTML = '<span class="dot-anim"><span></span><span></span><span></span></span>';
+
+  try {
+    const msgs = [{ role: 'system', content: system }, ...aiMsgs.slice(-10)];
+    const r = await fetch(`${prov.base}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({ model: prov.model, messages: msgs, max_tokens: 4096 })
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error.message);
+    const reply = d.choices?.[0]?.message?.content || '';
+    thinking.querySelector('.ai-content').innerHTML = md(reply);
+    aiMsgs.push({ role: 'assistant', content: reply });
+  } catch(e) {
+    thinking.querySelector('.ai-content').innerHTML = `<span style="color:#f85149">Erro: ${esc(e.message)}</span>`;
+  }
+
+  document.getElementById('ai-msgs').scrollTop = 99999;
+};
+
+function addAIMsg(role, content) {
+  const div = document.createElement('div');
+  div.className = 'ai-msg ' + role;
+  div.innerHTML = `<div class="ai-content">${content ? md(content) : ''}</div>`;
+  document.getElementById('ai-msgs').appendChild(div);
+  document.getElementById('ai-msgs').scrollTop = 99999;
+  return div;
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function md(s) {
+  return String(s).replace(/```([\s\S]*?)```/g,'<pre style="background:#0a0e14;padding:8px;border-radius:4px;overflow-x:auto;margin:4px 0;font-size:11px;"><code>$1</code></pre>').replace(/`([^`]+)`/g,'<code style="background:#0a0e14;padding:1px 4px;border-radius:3px;">$1</code>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+}
+
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.background = type==='err'?'#da3633':'#238636';
+  t.style.display = 'block'; setTimeout(()=>t.style.display='none',3000);
+}
+
+window.toggleTree = () => document.getElementById('tree').classList.toggle('hidden');
+
+init();
+</script>
+</body>
+</html>
