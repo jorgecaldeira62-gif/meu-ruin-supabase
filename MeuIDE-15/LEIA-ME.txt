@@ -1,0 +1,43 @@
+╔══════════════════════════════════════════════════════╗
+║              ⚡  MeuIDE — Guia Rápido               ║
+╚══════════════════════════════════════════════════════╝
+
+COMO ABRIR
+  Abra o arquivo index.html no Chrome
+  (pode abrir pelo index direto — funciona offline)
+
+CONFIGURAR SUPABASE (para salvar dados na nuvem)
+  1. Acesse: https://supabase.com
+  2. Crie uma conta gratuita e um projeto
+  3. Vá em Settings → API
+  4. Copie a "Project URL" e a "anon/public" key
+  5. Cole na tela de login do MeuIDE
+  6. Clique "Salvar"
+
+CRIAR AS TABELAS NO SUPABASE
+  1. No Supabase: SQL Editor → New Query
+  2. Abra o arquivo supabase.sql desta pasta
+  3. Cole o conteúdo e clique "Run"
+  4. Pronto — tabelas criadas!
+
+CONFIGURAR IA
+  1. Entre no MeuIDE
+  2. No Chat: clique em ⚙️ IA
+  3. Clique "+ Adicionar chave"
+  4. Cole sua chave (veja prefixos abaixo)
+  5. Marque como Ativa e salve
+
+CHAVES DE IA (gratuitas recomendadas)
+  Gemini: AIza...  →  aistudio.google.com (grátis)
+  Groq:   gsk_...  →  console.groq.com (grátis)
+  OpenAI: sk-...   →  platform.openai.com (pago)
+
+INSTALAR COMO PWA (opcional)
+  No Chrome: ⋮ → Instalar MeuIDE
+  Funciona como app no celular e no PC!
+
+OS 3 MÓDULOS
+  index.html     Login e configuração
+  editor.html    Editor de código + árvore de arquivos
+  chat.html      Chat com IA + TTS + memória
+  playground.html  HTML/CSS/JS com preview ao vivo
