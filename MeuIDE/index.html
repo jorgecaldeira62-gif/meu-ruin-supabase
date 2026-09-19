@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>MeuIDE — Login</title>
+<link rel="manifest" href="manifest.json"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;min-height:100dvh;display:flex;align-items:center;justify-content:center;}
+.card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:32px;width:100%;max-width:400px;margin:16px;}
+h1{font-size:22px;font-weight:700;color:#58a6ff;margin-bottom:4px;}
+p{font-size:13px;color:#8b949e;margin-bottom:24px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12px;color:#8b949e;margin-bottom:5px;}
+.field input{width:100%;background:#0a0e14;border:1px solid #30363d;color:#e6edf3;border-radius:6px;padding:9px 12px;font-size:14px;}
+.field input:focus{outline:none;border-color:#58a6ff;}
+.btn{width:100%;padding:10px;border-radius:6px;font-size:14px;font-weight:600;border:none;cursor:pointer;margin-bottom:8px;}
+.btn-blue{background:#1f6feb;color:#fff;}
+.btn-gray{background:#21262d;color:#e6edf3;border:1px solid #30363d;font-size:12px;}
+.divider{text-align:center;color:#30363d;margin:16px 0;font-size:12px;position:relative;}
+.divider::before,.divider::after{content:'';position:absolute;top:50%;width:45%;height:1px;background:#30363d;}
+.divider::before{left:0;} .divider::after{right:0;}
+.setup-card{background:#0a0e14;border:1px solid #30363d;border-radius:8px;padding:16px;margin-top:16px;}
+.setup-card h3{font-size:13px;color:#d29922;margin-bottom:10px;}
+.setup-field{display:flex;gap:6px;margin-bottom:8px;}
+.setup-field input{flex:1;background:#161b22;border:1px solid #30363d;color:#e6edf3;border-radius:6px;padding:6px 10px;font-size:12px;font-family:monospace;}
+.msg{font-size:12px;padding:8px;border-radius:6px;margin-top:8px;display:none;}
+.msg.err{background:#3d1f1f;color:#f85149;}
+.msg.ok{background:#0d2e16;color:#3fb950;}
+#toast{position:fixed;bottom:20px;right:20px;padding:8px 16px;border-radius:6px;font-size:13px;color:#fff;display:none;z-index:99;}
+</style>
+
+  <!-- PWA: Gerado pelo PWA Builder -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#344729">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Meu App">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js')
+          .then(r => console.log('[PWA] Service Worker registrado!', r.scope))
+          .catch(e => console.error('[PWA] Erro:', e));
+      });
+    }
+  </script>
+</head>
+<body>
+<div class="card">
+  <h1>⚡ MeuIDE</h1>
+  <p>Editor · Chat IA · Playground</p>
+
+  <div id="login-section">
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="email" placeholder="seu@email.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <input type="password" id="pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()">
+    </div>
+    <button class="btn btn-blue" onclick="login()">Entrar</button>
+    <button class="btn btn-gray" onclick="register()">Criar conta</button>
+    <button class="btn btn-gray" onclick="resetPass()">Esqueci a senha</button>
+    <div id="msg" class="msg"></div>
+  </div>
+
+  <div class="setup-card">
+    <h3>⚙️ Configurar Supabase</h3>
+    <div class="setup-field">
+      <input id="sb-url" type="text" placeholder="URL do projeto (https://xxx.supabase.co)" value="">
+    </div>
+    <div class="setup-field">
+      <input id="sb-key" type="password" placeholder="anon/public key (eyJ...)">
+      <button onclick="saveSupabase()" style="background:#1f6feb;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;">Salvar</button>
+    </div>
+    <div style="font-size:11px;color:#8b949e;">
+      Encontre em: <a href="https://supabase.com/dashboard" target="_blank" style="color:#58a6ff;">supabase.com</a> → seu projeto → Settings → API
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script type="module">
+const sbUrl = () => localStorage.getItem('sb_url') || '';
+const sbKey = () => localStorage.getItem('sb_key') || '';
+
+// Preencher campos salvos
+document.getElementById('sb-url').value = sbUrl();
+
+let _sb = null;
+async function getSB() {
+  if (_sb) return _sb;
+  if (!sbUrl() || !sbKey()) return null;
+  const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+  _sb = createClient(sbUrl(), sbKey());
+  return _sb;
+}
+
+function showMsg(txt, type) {
+  const el = document.getElementById('msg');
+  el.textContent = txt; el.className = 'msg ' + type; el.style.display = 'block';
+}
+
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = type==='err'?'#da3633':'#238636';
+  t.style.display = 'block';
+  setTimeout(()=>t.style.display='none', 3000);
+}
+
+window.saveSupabase = () => {
+  const url = document.getElementById('sb-url').value.trim();
+  const key = document.getElementById('sb-key').value.trim();
+  if (!url || !key) { toast('Preencha URL e Key!', 'err'); return; }
+  localStorage.setItem('sb_url', url);
+  localStorage.setItem('sb_key', key);
+  _sb = null;
+  document.getElementById('sb-key').value = '';
+  toast('✅ Supabase configurado!');
+};
+
+window.login = async () => {
+  const sb = await getSB();
+  if (!sb) { showMsg('Configure o Supabase primeiro!', 'err'); return; }
+  const email = document.getElementById('email').value.trim();
+  const pass = document.getElementById('pass').value;
+  if (!email || !pass) { showMsg('Preencha email e senha.', 'err'); return; }
+  showMsg('Entrando...', 'ok');
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) { showMsg('Erro: ' + error.message, 'err'); return; }
+  window.location.href = 'editor.html';
+};
+
+window.register = async () => {
+  const sb = await getSB();
+  if (!sb) { showMsg('Configure o Supabase primeiro!', 'err'); return; }
+  const email = document.getElementById('email').value.trim();
+  const pass = document.getElementById('pass').value;
+  if (!email || !pass) { showMsg('Preencha email e senha.', 'err'); return; }
+  showMsg('Criando conta...', 'ok');
+  const { error } = await sb.auth.signUp({ email, password: pass });
+  if (error) { showMsg('Erro: ' + error.message, 'err'); return; }
+  showMsg('✅ Conta criada! Verifique seu email para confirmar.', 'ok');
+};
+
+window.resetPass = async () => {
+  const sb = await getSB();
+  if (!sb) { showMsg('Configure o Supabase primeiro!', 'err'); return; }
+  const email = document.getElementById('email').value.trim();
+  if (!email) { showMsg('Digite seu email primeiro.', 'err'); return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email);
+  if (error) { showMsg('Erro: ' + error.message, 'err'); return; }
+  showMsg('✅ Email de recuperação enviado!', 'ok');
+};
+
+// Auto-login se já logado
+(async () => {
+  const sb = await getSB();
+  if (!sb) return;
+  const { data } = await sb.auth.getUser();
+  if (data?.user) window.location.href = 'editor.html';
+})();
+</script>
+</body>
+</html>
