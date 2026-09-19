@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>CodeLens</title>
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#0d1117"/>
+<link rel="icon" href="icons/icon-192.png"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+<style>
+/* ── Reset ── */
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{--bg:#0d1117;--sf:#161b22;--sf2:#1c2128;--bd:#30363d;--tx:#e6edf3;--mu:#8b949e;
+  --bl:#58a6ff;--gr:#3fb950;--rd:#f85149;--yl:#d29922;}
+html,body{height:100%;background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;overflow:hidden;}
+
+/* ── Layout ── */
+#app{display:flex;flex-direction:column;height:100dvh;}
+
+/* ── Topbar ── */
+#topbar{display:flex;align-items:center;height:44px;background:var(--sf);border-bottom:1px solid var(--bd);padding:0 10px;gap:4px;flex-shrink:0;}
+.logo{font-size:14px;font-weight:700;color:var(--bl);margin-right:8px;}
+.nav-btn{background:none;border:none;color:var(--mu);padding:5px 10px;border-radius:5px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;height:44px;}
+.nav-btn.active{color:var(--tx);border-bottom-color:var(--bl);}
+.nav-btn:hover:not(.active){background:var(--sf2);color:var(--tx);}
+#topbar-right{margin-left:auto;display:flex;gap:6px;align-items:center;font-size:12px;color:var(--mu);}
+
+/* ── Seções ── */
+#main{flex:1;display:flex;overflow:hidden;}
+.section{display:none;flex:1;flex-direction:column;overflow:hidden;}
+.section.active{display:flex;}
+
+/* ── HOME ── */
+#sec-home{overflow-y:auto;}
+.home-wrap{max-width:820px;margin:0 auto;padding:28px 20px;}
+.home-wrap h2{font-size:18px;font-weight:700;margin-bottom:4px;}
+.home-wrap > p{color:var(--mu);font-size:13px;margin-bottom:24px;}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:18px;cursor:pointer;transition:.15s;}
+.card:hover{border-color:var(--bl);background:#0d1f40;}
+.card .ci{font-size:28px;margin-bottom:10px;}
+.card h3{font-size:13px;font-weight:700;margin-bottom:4px;}
+.card p{font-size:12px;color:var(--mu);line-height:1.5;}
+.status-row{display:flex;gap:14px;margin-top:20px;padding-top:14px;border-top:1px solid var(--bd);font-size:12px;color:var(--mu);flex-wrap:wrap;}
+.sdot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle;}
+
+/* ── EDITOR ── */
+#sec-editor{flex-direction:row;}
+#ed-sidebar{width:210px;flex-shrink:0;border-right:1px solid var(--bd);display:flex;flex-direction:column;background:var(--sf);}
+#ed-sidebar.hidden{display:none;}
+.sb-hdr{display:flex;align-items:center;gap:3px;padding:5px;border-bottom:1px solid var(--bd);flex-shrink:0;}
+.sb-hdr span{flex:1;font-size:11px;font-weight:600;color:var(--mu);}
+.sb-btn{background:none;border:none;color:var(--mu);cursor:pointer;padding:3px 5px;border-radius:4px;font-size:13px;}
+.sb-btn:hover{background:var(--sf2);color:var(--tx);}
+#ed-tree{flex:1;overflow-y:auto;padding:3px 0;}
+.tree-item{display:flex;align-items:center;gap:5px;padding:4px 8px;cursor:pointer;font-size:12px;border-radius:4px;margin:1px 4px;color:var(--mu);}
+.tree-item:hover,.tree-item.active{background:var(--sf2);color:var(--tx);}
+.tree-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tree-del{margin-left:auto;background:none;border:none;color:var(--rd);cursor:pointer;opacity:0;font-size:11px;padding:0 2px;}
+.tree-item:hover .tree-del{opacity:1;}
+.tree-empty{padding:12px;font-size:12px;color:var(--mu);line-height:1.5;}
+.ed-main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+.ed-toolbar{display:flex;align-items:center;gap:5px;padding:5px 8px;background:var(--sf);border-bottom:1px solid var(--bd);flex-shrink:0;flex-wrap:wrap;}
+.ed-fname{font-size:12px;font-family:monospace;color:var(--bl);}
+.ed-info{font-size:11px;color:var(--mu);}
+.ed-body{flex:1;display:flex;overflow:hidden;}
+textarea.code{flex:1;background:#0a0e14;color:var(--tx);border:none;resize:none;padding:12px;font-family:'Courier New',monospace;font-size:13px;line-height:1.6;outline:none;tab-size:2;}
+.pane{display:flex;flex-direction:column;}
+.pane.hidden{display:none;}
+.pane-hdr{display:flex;align-items:center;justify-content:space-between;padding:4px 8px;font-size:11px;color:var(--mu);background:#0a0e14;border-bottom:1px solid var(--bd);flex-shrink:0;}
+.pane-hdr button{background:none;border:none;color:var(--mu);cursor:pointer;font-size:11px;}
+#ed-preview-pane{width:40%;border-left:1px solid var(--bd);}
+iframe.preview{flex:1;border:none;background:#fff;}
+#ed-ai-pane{width:260px;border-left:1px solid var(--bd);}
+.ai-msgs-wrap{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;}
+.ai-msg{padding:7px 9px;border-radius:6px;font-size:12px;line-height:1.5;}
+.ai-msg.user{background:var(--sf2);border-left:2px solid var(--bl);}
+.ai-msg.assistant{background:var(--sf);border-left:2px solid var(--gr);}
+.ai-msg pre{background:#0a0e14;padding:6px;border-radius:4px;overflow-x:auto;font-size:11px;margin:4px 0;}
+.ai-inp-wrap{padding:6px;border-top:1px solid var(--bd);}
+.ai-inp-wrap textarea{width:100%;background:#0a0e14;border:1px solid var(--bd);color:var(--tx);border-radius:5px;padding:6px;font-size:12px;resize:none;font-family:inherit;outline:none;}
+.ai-inp-wrap textarea:focus{border-color:var(--bl);}
+
+/* ── PLAYGROUND ── */
+#sec-playground{flex-direction:column;}
+.pg-toolbar{display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--sf);border-bottom:1px solid var(--bd);flex-shrink:0;flex-wrap:wrap;}
+.tab-group{display:flex;border-radius:5px;overflow:hidden;border:1px solid var(--bd);}
+.tab-group button{padding:4px 11px;font-size:11px;border:none;background:transparent;color:var(--mu);cursor:pointer;}
+.tab-group button.active{background:#1f6feb;color:#fff;}
+.pg-body{flex:1;display:flex;overflow:hidden;}
+.pg-editor-col{flex:1;display:flex;flex-direction:column;border-right:1px solid var(--bd);}
+.pg-preview-col{flex:1;display:flex;flex-direction:column;}
+#snip-drawer{width:190px;border-left:1px solid var(--bd);display:flex;flex-direction:column;background:var(--sf);}
+#snip-drawer.hidden{display:none;}
+.snip-item{display:flex;align-items:center;padding:7px 9px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--bd);}
+.snip-item:hover{background:var(--sf2);}
+.snip-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.snip-del{background:none;border:none;color:var(--rd);cursor:pointer;opacity:0;font-size:12px;}
+.snip-item:hover .snip-del{opacity:1;}
+.empty-msg{padding:12px;font-size:12px;color:var(--mu);}
+
+/* ── CHAT ── */
+#sec-chat{flex-direction:column;}
+.chat-bar{display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--sf);border-bottom:1px solid var(--bd);flex-shrink:0;flex-wrap:wrap;}
+.chat-body{display:flex;flex:1;overflow:hidden;}
+#conv-sidebar{width:185px;border-right:1px solid var(--bd);display:flex;flex-direction:column;background:var(--sf);}
+#conv-sidebar.hidden{display:none;}
+.conv-item{padding:8px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--bd);color:var(--mu);}
+.conv-item:hover,.conv-item.active{background:var(--sf2);color:var(--tx);}
+.conv-date{font-size:10px;color:var(--mu);margin-top:2px;}
+.chat-main{display:flex;flex-direction:column;flex:1;overflow:hidden;}
+#chat-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;}
+.bubble-wrap{display:flex;flex-direction:column;max-width:85%;}
+.bubble-wrap.user{align-self:flex-end;}
+.bubble-label{font-size:11px;color:var(--mu);margin-bottom:3px;}
+.bubble-wrap.user .bubble-label{color:var(--bl);}
+.bubble-wrap.assistant .bubble-label{color:var(--gr);}
+.bubble-body{padding:10px 12px;border-radius:8px;font-size:13px;line-height:1.6;}
+.bubble-wrap.user .bubble-body{background:var(--sf2);border-left:3px solid var(--bl);}
+.bubble-wrap.assistant .bubble-body{background:var(--sf);border-left:3px solid var(--gr);}
+.bubble-body pre{background:#0a0e14;padding:8px;border-radius:4px;overflow-x:auto;margin:6px 0;font-size:12px;}
+.chat-inp{padding:8px;background:var(--sf);border-top:1px solid var(--bd);flex-shrink:0;}
+.chat-inp-row{display:flex;gap:6px;}
+#chat-input{flex:1;resize:none;padding:8px;border-radius:6px;font-size:13px;max-height:100px;min-height:38px;background:#0a0e14;border:1px solid var(--bd);color:var(--tx);outline:none;font-family:inherit;}
+#chat-input:focus{border-color:var(--bl);}
+#tts-bar{display:none;align-items:center;gap:8px;padding:4px 10px;background:#0a0e14;border-top:1px solid var(--bd);font-size:12px;color:var(--mu);}
+
+/* ── SETTINGS ── */
+#sec-settings{overflow-y:auto;}
+.cfg-wrap{max-width:520px;margin:0 auto;padding:24px 16px;}
+.cfg-card{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:16px;margin-bottom:14px;}
+.cfg-card h3{font-size:13px;font-weight:600;margin-bottom:10px;}
+.cfg-card p{font-size:12px;color:var(--mu);margin-bottom:10px;}
+.cfg-row{display:flex;gap:6px;margin-bottom:8px;}
+.cfg-row input{flex:1;background:#0a0e14;border:1px solid var(--bd);color:var(--tx);border-radius:5px;padding:7px 9px;font-size:13px;font-family:inherit;outline:none;}
+.cfg-row input:focus{border-color:var(--bl);}
+.key-slot{background:#0a0e14;border:1px solid var(--bd);border-radius:5px;padding:8px;margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+.key-prov{font-size:11px;min-width:65px;}
+.key-input{flex:1;background:transparent;border:none;color:var(--tx);font-size:12px;font-family:monospace;outline:none;}
+.key-del{background:none;border:none;color:var(--rd);cursor:pointer;font-size:14px;flex-shrink:0;}
+#sql-box{width:100%;height:160px;background:#0a0e14;border:1px solid var(--bd);color:var(--mu);border-radius:5px;padding:8px;font-size:11px;font-family:monospace;resize:none;}
+
+/* ── Botões ── */
+.btn{padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;border:none;cursor:pointer;}
+.btn:hover{opacity:.85;}
+.btn-blue{background:#1f6feb;color:#fff;}
+.btn-green{background:#238636;color:#fff;}
+.btn-gray{background:var(--sf2);color:var(--tx);border:1px solid var(--bd);}
+.btn-red{background:#da3633;color:#fff;}
+select{background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:5px;padding:4px 8px;font-size:12px;}
+input[type=range]{accent-color:var(--bl);}
+label.chk{font-size:12px;color:var(--mu);display:flex;align-items:center;gap:3px;}
+.mem-badge{font-size:11px;color:var(--mu);background:var(--sf2);padding:2px 8px;border-radius:4px;}
+
+/* ── Shared ── */
+.dot-anim span{animation:blink 1.2s infinite;display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--gr);margin:0 1px;}
+.dot-anim span:nth-child(2){animation-delay:.2s;}.dot-anim span:nth-child(3){animation-delay:.4s;}
+@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px;}
+#toast{display:none;}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <span class="logo">⚡ CodeLens</span>
+  <button class="nav-btn active" onclick="go('home')">🏠</button>
+  <button class="nav-btn" onclick="go('editor')">💻 Editor</button>
+  <button class="nav-btn" onclick="go('playground')">🎨 Playground</button>
+  <button class="nav-btn" onclick="go('chat')">💬 Chat</button>
+  <button class="nav-btn" onclick="go('settings')">⚙️ Config</button>
+  <div id="topbar-right">
+    <span id="ai-badge"></span>
+    <span id="user-info"></span>
+  </div>
+</div>
+
+<div id="main">
+
+<!-- ══ HOME ══ -->
+<section id="sec-home" class="section active">
+  <div class="home-wrap">
+    <h2>CodeLens</h2>
+    <p>Editor de código · Playground · Chat com IA · Banco de dados Supabase</p>
+    <div class="cards">
+      <div class="card" onclick="go('editor')"><div class="ci">💻</div><h3>Editor</h3><p>Árvore de arquivos, preview ao vivo, importar/exportar ZIP, GitHub.</p></div>
+      <div class="card" onclick="go('playground')"><div class="ci">🎨</div><h3>Playground</h3><p>HTML · CSS · JS em abas, preview ao vivo, salvar snippets, baixar .html.</p></div>
+      <div class="card" onclick="go('chat')"><div class="ci">💬</div><h3>Chat IA</h3><p>Gemini, Groq, OpenAI. TTS, memória automática, histórico salvo.</p></div>
+      <div class="card" onclick="go('settings')"><div class="ci">⚙️</div><h3>Configurar</h3><p>Supabase, chaves de IA, GitHub, login com email e senha.</p></div>
+    </div>
+    <div class="status-row">
+      <span><span class="sdot" id="sb-dot" style="background:var(--mu)"></span>Supabase: <span id="sb-lbl">não configurado</span></span>
+      <span><span class="sdot" id="ai-dot" style="background:var(--mu)"></span>IA: <span id="ai-lbl">não configurada</span></span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ EDITOR ══ -->
+<section id="sec-editor" class="section">
+  <div id="ed-sidebar">
+    <div class="sb-hdr">
+      <span>Arquivos</span>
+      <button class="sb-btn" onclick="newEdFile()" title="Novo">+</button>
+      <button class="sb-btn" onclick="importEdZip()" title="Importar ZIP">⬆</button>
+      <button class="sb-btn" onclick="exportEdZip()" title="Exportar ZIP">⬇</button>
+    </div>
+    <div id="ed-tree"></div>
+  </div>
+  <div class="ed-main">
+    <div class="ed-toolbar">
+      <button class="btn btn-gray" onclick="toggleEdSidebar()">☰</button>
+      <span class="ed-fname" id="ed-fname">sem arquivo</span>
+      <span class="ed-info" id="ed-info"></span>
+      <div style="margin-left:auto;display:flex;gap:4px;">
+        <button class="btn btn-gray" onclick="saveFile()">💾</button>
+        <button class="btn btn-gray" onclick="pushGitHub()">🔀 Git</button>
+        <button class="btn btn-gray" onclick="toggleEdPreview()">👁</button>
+        <button class="btn btn-gray" onclick="toggleEdAI()">🤖</button>
+      </div>
+    </div>
+    <div class="ed-body">
+      <textarea class="code" id="ed-code" spellcheck="false"
+        oninput="onEdChange()" onkeydown="handleTab(event,this)"
+        placeholder="Abra um arquivo da árvore..."></textarea>
+      <div id="ed-preview-pane" class="pane hidden">
+        <div class="pane-hdr"><span>👁 Preview</span><button onclick="toggleEdPreview()">✕</button></div>
+        <iframe class="preview" id="ed-preview" sandbox="allow-scripts allow-modals allow-forms"></iframe>
+      </div>
+      <div id="ed-ai-pane" class="pane hidden">
+        <div class="pane-hdr"><span>🤖 IA</span><button onclick="clearEdAI()">🗑</button></div>
+        <div class="ai-msgs-wrap" id="ed-ai-msgs"></div>
+        <div class="ai-inp-wrap">
+          <textarea rows="3" id="ed-ai-input" placeholder="Ctrl+Enter envia..."
+            onkeydown="if(event.ctrlKey&&event.key==='Enter'){sendEdAI();event.preventDefault();}"></textarea>
+          <div style="display:flex;justify-content:flex-end;margin-top:4px;">
+            <button class="btn btn-blue" style="font-size:11px;padding:4px 10px;" onclick="sendEdAI()">▶</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="ed-zip-input" accept=".zip" style="display:none" onchange="handleEdZip(event)">
+</section>
+
+<!-- ══ PLAYGROUND ══ -->
+<section id="sec-playground" class="section">
+  <div class="pg-toolbar">
+    <div class="tab-group">
+      <button id="pg-btn-html" class="active" onclick="setPgTab('html')">HTML</button>
+      <button id="pg-btn-css"  onclick="setPgTab('css')">CSS</button>
+      <button id="pg-btn-js"   onclick="setPgTab('js')">JS</button>
+    </div>
+    <input type="text" id="pg-title" placeholder="Nome do snippet..."
+      style="background:#0a0e14;border:1px solid var(--bd);color:var(--tx);border-radius:5px;padding:4px 9px;font-size:12px;width:150px;">
+    <button class="btn btn-blue" onclick="runPg()">▶ Run</button>
+    <label class="chk"><input type="checkbox" id="pg-auto" checked style="accent-color:var(--bl);">Auto</label>
+    <button class="btn btn-green" onclick="savePg()">💾</button>
+    <button class="btn btn-gray" onclick="downloadPg()">⬇ .html</button>
+    <button class="btn btn-gray" onclick="fullscreenPg()">⛶</button>
+    <button class="btn btn-gray" onclick="toggleSnippetDrawer()">📂</button>
+  </div>
+  <div class="pg-body">
+    <div class="pg-editor-col">
+      <div class="pane-hdr"><span id="pg-tab-lbl">✏️ HTML</span></div>
+      <textarea class="code" id="pg-editor" spellcheck="false"
+        oninput="onPgChange()" onkeydown="handleTab(event,this)"></textarea>
+    </div>
+    <div class="pg-preview-col">
+      <div class="pane-hdr">👁 Preview ao vivo</div>
+      <iframe class="preview" id="pg-frame" sandbox="allow-scripts allow-modals allow-forms allow-popups"></iframe>
+    </div>
+    <div id="snip-drawer" class="hidden">
+      <div class="pane-hdr"><span>Snippets</span></div>
+      <div id="snip-list" style="flex:1;overflow-y:auto;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CHAT ══ -->
+<section id="sec-chat" class="section">
+  <div class="chat-bar">
+    <button class="btn btn-gray" onclick="toggleConvSidebar()">☰</button>
+    <select id="ctx-sel">
+      <option value="2000">2k</option>
+      <option value="4000" selected>4k</option>
+      <option value="8000">8k</option>
+      <option value="16000">16k</option>
+      <option value="32000">32k</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="use-mem" checked style="accent-color:var(--bl);">🧠 Memória</label>
+    <label class="chk"><input type="checkbox" id="use-tts" onchange="toggleTTSBar()" style="accent-color:var(--bl);">🔊 Voz</label>
+    <span class="mem-badge" id="mem-badge">0 msgs</span>
+    <div style="margin-left:auto;display:flex;gap:4px;">
+      <button class="btn btn-gray" onclick="newConv()">+ Nova</button>
+      <button class="btn btn-gray" onclick="clearChat()">🗑</button>
+      <button class="btn btn-gray" onclick="exportChat()">⬇</button>
+    </div>
+  </div>
+  <div class="chat-body">
+    <div id="conv-sidebar" class="hidden">
+      <div class="pane-hdr"><span>Conversas</span><button onclick="newConv()" style="background:none;border:none;color:var(--mu);cursor:pointer;">+</button></div>
+      <div id="conv-list" style="flex:1;overflow-y:auto;"></div>
+    </div>
+    <div class="chat-main">
+      <div id="chat-msgs"></div>
+      <div id="tts-bar">
+        <span>Velocidade:</span>
+        <input type="range" id="tts-speed" min="0.5" max="2" step="0.05" value="1.1"
+          oninput="document.getElementById('tts-lbl').textContent=parseFloat(this.value).toFixed(2)+'x'">
+        <span id="tts-lbl">1.10x</span>
+        <button onclick="stopTTS()" style="margin-left:auto;background:#da3633;color:#fff;border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:11px;">⏹</button>
+      </div>
+      <div class="chat-inp">
+        <div class="chat-inp-row">
+          <textarea id="chat-input" rows="2" placeholder="Mensagem... (Ctrl+Enter envia)"
+            onkeydown="if(event.ctrlKey&&event.key==='Enter'){sendChat();event.preventDefault();}"></textarea>
+          <button class="btn btn-blue" id="chat-send" onclick="sendChat()">▶</button>
+        </div>
+        <div style="font-size:11px;color:var(--mu);margin-top:3px;" id="chat-ai-info">IA não configurada</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SETTINGS ══ -->
+<section id="sec-settings" class="section">
+  <div class="cfg-wrap">
+    <div class="cfg-card">
+      <h3>🗄 Supabase</h3>
+      <p>Banco de dados na nuvem. Encontre em <a href="https://supabase.com/dashboard" target="_blank" style="color:var(--bl);">supabase.com</a> → Settings → API</p>
+      <div class="cfg-row"><input type="text" id="cfg-sb-url" placeholder="URL — https://xxx.supabase.co"></div>
+      <div class="cfg-row">
+        <input type="password" id="cfg-sb-key" placeholder="Anon key — eyJ...">
+        <button class="btn btn-blue" onclick="saveSB()">Salvar</button>
+      </div>
+    </div>
+
+    <div class="cfg-card">
+      <h3>🤖 Chaves de IA</h3>
+      <p>Gemini grátis: <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--bl);">AIza...</a> &nbsp;·&nbsp; Groq grátis: <a href="https://console.groq.com/keys" target="_blank" style="color:var(--bl);">gsk_...</a></p>
+      <div id="key-slots"></div>
+      <div class="cfg-row">
+        <input type="text" id="new-key" placeholder="Cole a chave aqui (AIza... / gsk_ / sk-...)">
+        <button class="btn btn-green" onclick="addKey()">+ Adicionar</button>
+      </div>
+    </div>
+
+    <div class="cfg-card">
+      <h3>🔀 GitHub</h3>
+      <div class="cfg-row">
+        <input type="password" id="cfg-gh-token" placeholder="Token — ghp_...">
+        <input type="text" id="cfg-gh-repo" placeholder="usuario/repositorio">
+        <button class="btn btn-blue" onclick="saveGH()">Salvar</button>
+      </div>
+    </div>
+
+    <div class="cfg-card">
+      <h3>👤 Conta</h3>
+      <div class="cfg-row">
+        <input type="email" id="auth-email" placeholder="email@exemplo.com">
+        <input type="password" id="auth-pass" placeholder="senha">
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+        <button class="btn btn-blue" onclick="doLogin()">Entrar</button>
+        <button class="btn btn-gray" onclick="doRegister()">Criar conta</button>
+        <button class="btn btn-gray" onclick="doReset()">Esqueci a senha</button>
+        <button class="btn btn-red" onclick="doLogout()">Sair</button>
+      </div>
+      <div id="auth-msg" style="font-size:12px;"></div>
+    </div>
+
+    <div class="cfg-card" style="background:#0a0e14;">
+      <h3 style="color:var(--yl);">📋 SQL para criar tabelas no Supabase</h3>
+      <p style="color:var(--mu);">Cole no SQL Editor do Supabase e clique Run:</p>
+      <textarea id="sql-box" readonly></textarea>
+      <button class="btn btn-gray" style="margin-top:6px;font-size:11px;" onclick="copySql()">📋 Copiar SQL</button>
+    </div>
+  </div>
+</section>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- SCRIPTS — ordem importa! -->
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="router.js"></script>
+<script src="editor.js"></script>
+<script src="playground.js"></script>
+<script src="chat.js"></script>
+<script src="settings.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
