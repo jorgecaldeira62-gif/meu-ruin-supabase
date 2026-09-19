@@ -1,0 +1,2024 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Playground Modular</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #0b1120;
+      --panel: #111827;
+      --panel-2: #172033;
+      --editor: #020617;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --border: #334155;
+      --primary: #6b8e23;
+      --primary-hover: #556b2f;
+      --success: #059669;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --line: #1e293b;
+    }
+
+    :root.light {
+      --bg: #f1f5f9;
+      --panel: #ffffff;
+      --panel-2: #e2e8f0;
+      --editor: #f8fafc;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #cbd5e1;
+      --line: #e2e8f0;
+      --primary: #7cb342;
+      --primary-hover: #689f38;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background: var(--bg);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 12px;
+      min-height: 52px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      flex-wrap: wrap;
+    }
+
+    .brand,
+    .toolbar,
+    .toolbar-group,
+    .mode-group,
+    .tabs,
+    .status-area {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand {
+      min-width: 0;
+    }
+
+    .brand-icon {
+      color: #7cb342;
+      font-size: 20px;
+    }
+
+    .brand-name {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .project-title {
+      width: 150px;
+      padding: 7px 9px;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      outline: none;
+      color: var(--text);
+      background: transparent;
+    }
+
+    .project-title:focus {
+      border-color: var(--border);
+      background: var(--editor);
+    }
+
+    .mode-group,
+    .tabs {
+      padding: 3px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--panel-2);
+    }
+
+    .btn,
+    .mode-btn,
+    .tab-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      min-height: 30px;
+      padding: 6px 10px;
+      border-radius: 5px;
+      color: var(--text);
+      background: transparent;
+      white-space: nowrap;
+    }
+
+    .btn:hover,
+    .mode-btn:hover,
+    .tab-btn:hover {
+      background: var(--panel-2);
+    }
+
+    .btn.primary,
+    .mode-btn.active,
+    .tab-btn.active {
+      color: white;
+      background: var(--primary);
+    }
+
+    .btn.primary:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn.success {
+      background: var(--success);
+      color: white;
+    }
+
+    .btn.danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    .btn.warning {
+      background: var(--warning);
+      color: white;
+    }
+
+    .btn.outline {
+      border: 1px solid var(--border);
+    }
+
+    .icon-btn {
+      width: 31px;
+      height: 31px;
+      padding: 0;
+    }
+
+    .status {
+      display: none;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
+
+    .status.show {
+      display: block;
+    }
+
+    .status.success {
+      color: #a7f3d0;
+      background: #064e3b;
+    }
+
+    .status.error {
+      color: #fecaca;
+      background: #7f1d1d;
+    }
+
+    .status.info {
+      color: #bfdbfe;
+      background: #1e3a8a;
+    }
+
+    .main {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      width: 280px;
+      min-width: 220px;
+      padding: 10px;
+      border-right: 1px solid var(--border);
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .sidebar-title {
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .search {
+      width: 100%;
+      margin-bottom: 8px;
+      padding: 8px 9px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      outline: none;
+      color: var(--text);
+      background: var(--editor);
+    }
+
+    .project-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .project-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 5px;
+      margin-bottom: 6px;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--panel-2);
+    }
+
+    .project-item:hover {
+      border-color: #7cb342;
+    }
+
+    .project-info {
+      flex: 1;
+      min-width: 0;
+      cursor: pointer;
+    }
+
+    .project-name {
+      overflow: hidden;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .project-meta {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .project-actions {
+      display: flex;
+      gap: 2px;
+    }
+
+    .small-btn {
+      width: 25px;
+      height: 25px;
+      padding: 0;
+      border-radius: 4px;
+      color: var(--muted);
+      background: transparent;
+    }
+
+    .small-btn:hover {
+      color: var(--text);
+      background: var(--panel);
+    }
+
+    .workarea {
+      display: flex;
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .editor-panel,
+    .preview-panel {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .editor-panel {
+      width: 50%;
+      border-right: 1px solid var(--border);
+    }
+
+    .editor-panel.collapsed {
+      display: none;
+    }
+
+    .preview-panel {
+      flex: 1;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-height: 42px;
+      padding: 6px 9px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+
+    .panel-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .live {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: #34d399;
+      font-size: 10px;
+      font-weight: 400;
+    }
+
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #34d399;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      50% {
+        opacity: 0.35;
+      }
+    }
+
+    .editor-tabs {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      overflow-x: auto;
+    }
+
+    .editor-tabs .tab-btn {
+      min-height: 27px;
+      padding: 5px 9px;
+      font-size: 11px;
+    }
+
+    .line-count {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .editor-wrap {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      background: var(--editor);
+    }
+
+    .line-numbers {
+      width: 42px;
+      padding: 9px 7px 9px 0;
+      border-right: 1px solid var(--line);
+      color: var(--muted);
+      font-family: Consolas, monospace;
+      font-size: 11px;
+      line-height: 1.65rem;
+      text-align: right;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    .code-editor {
+      flex: 1;
+      width: 100%;
+      min-width: 0;
+      min-height: 0;
+      padding: 9px 11px;
+      border: 0;
+      outline: none;
+      resize: none;
+      color: var(--text);
+      background: var(--editor);
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 13px;
+      line-height: 1.65rem;
+      tab-size: 2;
+    }
+
+    .preview-frame,
+    .python-output {
+      flex: 1;
+      width: 100%;
+      min-height: 0;
+      border: 0;
+      background: white;
+    }
+
+    .python-output {
+      padding: 14px;
+      overflow: auto;
+      color: #d1fae5;
+      background: #020617;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+
+    .empty {
+      padding: 25px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-style: italic;
+      text-align: center;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 15px;
+      background: rgb(0 0 0 / 65%);
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal {
+      width: min(560px, 100%);
+      max-height: 90vh;
+      overflow: auto;
+      padding: 18px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      background: var(--panel);
+      box-shadow: 0 20px 60px rgb(0 0 0 / 35%);
+    }
+
+    .modal h2 {
+      margin: 0 0 15px;
+      font-size: 17px;
+    }
+
+    .modal h3 {
+      margin: 18px 0 8px;
+      font-size: 13px;
+    }
+
+    .form-row {
+      margin-bottom: 10px;
+    }
+
+    .form-row label {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .form-row input,
+    .form-row select {
+      width: 100%;
+      padding: 9px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      outline: none;
+      color: var(--text);
+      background: var(--editor);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 7px;
+      margin-top: 15px;
+      flex-wrap: wrap;
+    }
+
+    .config-status {
+      margin-top: 10px;
+      padding: 9px;
+      border-radius: 5px;
+      color: var(--muted);
+      background: var(--editor);
+      font-size: 11px;
+      white-space: pre-wrap;
+    }
+
+    .mobile-toggle {
+      display: none;
+    }
+
+    .supabase-status {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 5px;
+      background: #dc2626;
+    }
+
+    .supabase-status.connected {
+      background: #059669;
+    }
+
+    /* RESPONSIVO */
+    @media (max-width: 1024px) {
+      .sidebar {
+        width: 220px;
+        min-width: 180px;
+      }
+
+      .project-title {
+        width: 120px;
+      }
+
+      .btn {
+        padding: 5px 8px;
+        font-size: 11px;
+      }
+
+      .toolbar {
+        gap: 4px;
+      }
+    }
+
+    @media (max-width: 850px) {
+      .sidebar {
+        display: none;
+      }
+
+      .editor-panel {
+        width: 50%;
+      }
+
+      .project-title {
+        width: 100px;
+      }
+
+      .btn {
+        padding: 4px 6px;
+        font-size: 10px;
+      }
+    }
+
+    @media (max-width: 650px) {
+      html,
+      body {
+        overflow: auto;
+      }
+
+      .app {
+        min-height: 100vh;
+        height: auto;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        flex-wrap: wrap;
+        min-height: auto;
+      }
+
+      .brand {
+        width: 100%;
+        margin-bottom: 6px;
+      }
+
+      .brand-name {
+        font-size: 12px;
+      }
+
+      .brand-icon {
+        font-size: 16px;
+      }
+
+      .mode-group {
+        order: 1;
+      }
+
+      .project-title {
+        width: 80px;
+        font-size: 11px;
+      }
+
+      .toolbar {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+
+      .main {
+        min-height: calc(100vh - 140px);
+      }
+
+      .workarea {
+        min-height: calc(100vh - 140px);
+      }
+
+      .editor-panel,
+      .preview-panel {
+        width: 100%;
+      }
+
+      .editor-panel.mobile-hidden,
+      .preview-panel.mobile-hidden {
+        display: none;
+      }
+
+      .mobile-toggle {
+        display: inline-flex;
+      }
+
+      .hide-mobile {
+        display: none;
+      }
+
+      .btn {
+        padding: 3px 5px;
+        font-size: 9px;
+        min-height: 26px;
+      }
+
+      .icon-btn {
+        width: 26px;
+        height: 26px;
+      }
+
+      .editor-tabs {
+        overflow-x: auto;
+        gap: 3px;
+      }
+
+      .editor-tabs .tab-btn {
+        min-height: 24px;
+        padding: 4px 6px;
+        font-size: 10px;
+      }
+
+      .line-count {
+        font-size: 9px;
+      }
+
+      .line-numbers {
+        width: 35px;
+        font-size: 10px;
+      }
+
+      .code-editor {
+        font-size: 12px;
+      }
+
+      .modal {
+        width: 95%;
+        padding: 12px;
+      }
+
+      .modal h2 {
+        font-size: 15px;
+        margin-bottom: 10px;
+      }
+
+      .form-row input,
+      .form-row select {
+        font-size: 14px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .topbar {
+        min-height: 40px;
+        padding: 6px 8px;
+      }
+
+      .brand-name {
+        display: none;
+      }
+
+      .brand-icon {
+        font-size: 14px;
+      }
+
+      .project-title {
+        width: 60px;
+        font-size: 10px;
+      }
+
+      .btn {
+        padding: 2px 4px;
+        font-size: 8px;
+        min-height: 24px;
+      }
+
+      .toolbar {
+        gap: 2px;
+      }
+
+      .icon-btn {
+        width: 24px;
+        height: 24px;
+      }
+
+      .editor-tabs .tab-btn {
+        min-height: 22px;
+        padding: 3px 5px;
+        font-size: 9px;
+      }
+
+      .line-numbers {
+        width: 30px;
+        font-size: 9px;
+        padding: 6px 5px 6px 0;
+      }
+
+      .code-editor {
+        font-size: 11px;
+        padding: 6px 8px;
+      }
+
+      .modal {
+        width: 98%;
+        padding: 10px;
+      }
+
+      .modal h2 {
+        font-size: 13px;
+      }
+
+      .modal h3 {
+        font-size: 11px;
+      }
+
+      .form-row label {
+        font-size: 10px;
+      }
+
+      .form-row input,
+      .form-row select {
+        font-size: 13px;
+        padding: 6px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon">◆</span>
+        <span class="brand-name">Playground</span>
+
+        <div class="mode-group">
+          <button class="mode-btn active" data-mode="html">HTML</button>
+          <button class="mode-btn" data-mode="react">React</button>
+        </div>
+
+        <input id="projectTitle" class="project-title" value="Sem título" placeholder="Nome do projeto" />
+      </div>
+
+      <div class="toolbar">
+        <button id="mobileEditorBtn" class="btn outline mobile-toggle">Código</button>
+        <button id="mobilePreviewBtn" class="btn outline mobile-toggle">Preview</button>
+        <button id="autoRunBtn" class="btn primary">◉ Ao vivo</button>
+        <button id="runBtn" class="btn primary">▶ Executar</button>
+        <button id="importBtn" class="btn outline">↑ Importar</button>
+        <button id="copyBtn" class="btn outline">⧉ Copiar</button>
+        <button id="downloadBtn" class="btn outline">↓ Baixar</button>
+        <button id="saveLocalBtn" class="btn success">Salvar local</button>
+        <button id="saveCloudBtn" class="btn primary">
+          <span class="supabase-status"></span>
+          Supabase
+        </button>
+        <button id="openBtn" class="btn outline">Abrir</button>
+        <button id="configBtn" class="btn outline">Banco</button>
+        <button id="themeBtn" class="btn outline icon-btn" title="Alternar tema">☾</button>
+        <button id="fullscreenBtn" class="btn outline icon-btn" title="Fullscreen">⛶</button>
+        <button id="resetBtn" class="btn outline icon-btn" title="Restaurar">↺</button>
+        <button id="clearBtn" class="btn outline icon-btn" title="Limpar">⌫</button>
+      </div>
+    </header>
+
+    <div id="status" class="status"></div>
+
+    <main class="main">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <span class="sidebar-title">Projetos salvos</span>
+          <div class="toolbar-group">
+            <button id="refreshBtn" class="small-btn" title="Atualizar">↻</button>
+          </div>
+        </div>
+
+        <input id="searchInput" class="search" placeholder="Pesquisar projeto..." />
+
+        <div id="projectList" class="project-list"></div>
+      </aside>
+
+      <section class="workarea">
+        <section id="editorPanel" class="editor-panel">
+          <div class="editor-tabs">
+            <button class="tab-btn active" data-tab="html">HTML</button>
+            <button class="tab-btn" data-tab="css">CSS</button>
+            <button class="tab-btn" data-tab="js">JS</button>
+            <button class="tab-btn" data-tab="jsx" style="display:none;">JSX</button>
+            <span id="lineCount" class="line-count">1 linha</span>
+            <button id="collapseBtn" class="btn outline icon-btn" title="Minimizar editor">‹</button>
+          </div>
+
+          <div class="editor-wrap">
+            <div id="lineNumbers" class="line-numbers">1</div>
+            <textarea id="codeEditor" class="code-editor" spellcheck="false"></textarea>
+          </div>
+        </section>
+
+        <section id="previewPanel" class="preview-panel">
+          <div class="panel-header">
+            <div class="panel-label">
+              <span>◉</span>
+              <span>Resultado</span>
+              <span id="liveIndicator" class="live">
+                <span class="live-dot"></span>
+                ao vivo
+              </span>
+            </div>
+
+            <button id="expandEditorBtn" class="btn outline icon-btn" title="Mostrar editor">›</button>
+          </div>
+
+          <iframe
+            id="previewFrame"
+            class="preview-frame"
+            sandbox="allow-scripts allow-modals allow-forms allow-popups"
+            title="Preview"
+          ></iframe>
+
+          <pre id="pythonOutput" class="python-output" hidden></pre>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <input id="fileInput" type="file" hidden accept=".html,.htm,.css,.js,.jsx,.tsx,.txt" />
+
+  <div id="configModal" class="modal-backdrop">
+    <div class="modal">
+      <h2>Configuração Supabase</h2>
+
+      <div class="form-row">
+        <label for="supabaseUrl">Project URL</label>
+        <input id="supabaseUrl" placeholder="https://seu-projeto.supabase.co" />
+      </div>
+
+      <div class="form-row">
+        <label for="supabaseKey">Chave pública anon</label>
+        <input id="supabaseKey" type="password" placeholder="eyJ..." />
+      </div>
+
+      <div class="toolbar-group">
+        <button id="testSupabaseBtn" class="btn primary">Testar</button>
+        <button id="clearSupabaseBtn" class="btn outline">Limpar</button>
+      </div>
+
+      <div id="configStatus" class="config-status">
+        Nenhum teste realizado.
+      </div>
+
+      <div class="modal-actions">
+        <button id="closeConfigBtn" class="btn outline">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="openModal" class="modal-backdrop">
+    <div class="modal">
+      <h2>Abrir projeto</h2>
+
+      <input id="openSearchInput" class="search" placeholder="Pesquisar projetos..." />
+
+      <div id="openProjectList"></div>
+
+      <div class="modal-actions">
+        <button id="closeOpenBtn" class="btn outline">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    "use strict";
+
+    const STORAGE_KEY = "playground_state_v1";
+    const LOCAL_PROJECTS_KEY = "playground_local_projects_v1";
+    const CONFIG_KEY = "playground_config_v1";
+    const SEQUENCE_KEY = "playground_sequence_v1";
+
+    const DEFAULT_HTML = `<div class="card">
+      <h1>Olá, Playground!</h1>
+      <p>Edite o HTML, CSS e JavaScript e veja o resultado ao vivo.</p>
+      <button id="helloButton">Clique aqui</button>
+    </div>`;
+
+    const DEFAULT_CSS = `body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: Arial, sans-serif;
+      background: #eef2ff;
+    }
+
+    .card {
+      width: min(560px, 90%);
+      padding: 32px;
+      border-radius: 18px;
+      background: white;
+      box-shadow: 0 20px 50px rgba(30, 41, 59, .18);
+      text-align: center;
+    }
+
+    h1 {
+      color: #6b8e23;
+    }
+
+    button {
+      padding: 10px 18px;
+      border: 0;
+      border-radius: 8px;
+      color: white;
+      background: #6b8e23;
+      cursor: pointer;
+    }`;
+
+    const DEFAULT_JS = `document.getElementById("helloButton")?.addEventListener("click", () => {
+      alert("Funcionou!");
+    });`;
+
+    const DEFAULT_JSX = `function App() {
+      const [contador, setContador] = React.useState(0);
+
+      return (
+        <main style={{ padding: 30, fontFamily: "Arial" }}>
+          <h1>React funcionando</h1>
+          <p>Contador: {contador}</p>
+          <button onClick={() => setContador(contador + 1)}>
+            Somar
+          </button>
+        </main>
+      );
+    }`;
+
+    const state = {
+      mode: "html",
+      tab: "html",
+      title: "Sem título",
+      html: DEFAULT_HTML,
+      css: DEFAULT_CSS,
+      js: DEFAULT_JS,
+      jsx: DEFAULT_JSX,
+      currentId: null,
+      autoRun: true,
+      editorCollapsed: false,
+      mobileView: "editor",
+      sequence: 0,
+      supabase: null,
+      supabaseConnected: false,
+      localProjects: [],
+      cloudProjects: []
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function showStatus(type, message, timeout = 5000) {
+      const el = $("status");
+      el.className = "status show " + type;
+      el.textContent = message;
+
+      if (timeout) {
+        window.clearTimeout(showStatus.timer);
+        showStatus.timer = window.setTimeout(() => {
+          el.className = "status";
+        }, timeout);
+      }
+    }
+
+    function showConfigStatus(message, type = "") {
+      const el = $("configStatus");
+      el.textContent = message;
+      el.style.color = type === "error" ? "#fca5a5" : type === "success" ? "#86efac" : "";
+    }
+
+    function updateSupabaseStatus() {
+      const indicator = document.querySelector(".supabase-status");
+      if (state.supabaseConnected) {
+        indicator.classList.add("connected");
+      } else {
+        indicator.classList.remove("connected");
+      }
+    }
+
+    function safeJsonParse(value, fallback) {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return fallback;
+      }
+    }
+
+    function loadState() {
+      const saved = safeJsonParse(localStorage.getItem(STORAGE_KEY), null);
+      if (saved) {
+        Object.assign(state, saved);
+      }
+
+      const config = safeJsonParse(localStorage.getItem(CONFIG_KEY), {});
+      $("supabaseUrl").value = config.url || "";
+      $("supabaseKey").value = config.key || "";
+
+      state.localProjects = safeJsonParse(
+        localStorage.getItem(LOCAL_PROJECTS_KEY),
+        []
+      );
+
+      state.sequence = Number(localStorage.getItem(SEQUENCE_KEY) || 0);
+
+      if (state.mode === "react") {
+        state.tab = "jsx";
+      }
+
+      renderAll();
+    }
+
+    function persistState() {
+      const copy = {
+        mode: state.mode,
+        tab: state.tab,
+        title: state.title,
+        html: state.html,
+        css: state.css,
+        js: state.js,
+        jsx: state.jsx,
+        currentId: state.currentId,
+        autoRun: state.autoRun,
+        editorCollapsed: state.editorCollapsed,
+        mobileView: state.mobileView
+      };
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(copy));
+    }
+
+    function nextSequence() {
+      state.sequence += 1;
+      localStorage.setItem(SEQUENCE_KEY, String(state.sequence));
+      return state.sequence;
+    }
+
+    function getCurrentCode() {
+      return state[state.tab] || "";
+    }
+
+    function setCurrentCode(value) {
+      state[state.tab] = value;
+      persistState();
+      updateEditor();
+      if (state.autoRun) {
+        schedulePreview();
+      }
+    }
+
+    function getProjectPayload() {
+      let html = state.html;
+      let css = state.css;
+      let js = state.js;
+
+      if (state.mode === "react") {
+        html = state.jsx;
+        css = state.css;
+        js = "";
+      }
+
+      return {
+        title: state.title.trim() || "Sem título",
+        html,
+        css,
+        js,
+        mode: state.mode
+      };
+    }
+
+    function getProjectRecord(source = "local") {
+      const payload = getProjectPayload();
+
+      return {
+        ...payload,
+        id: state.currentId || crypto.randomUUID(),
+        sequence: nextSequence(),
+        source,
+        saved_at: new Date().toISOString()
+      };
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+
+      if (mode === "react") {
+        state.tab = "jsx";
+      } else if (!["html", "css", "js"].includes(state.tab)) {
+        state.tab = "html";
+      }
+
+      persistState();
+      renderAll();
+      updatePreview();
+    }
+
+    function setTab(tab) {
+      state.tab = tab;
+
+      if (tab === "jsx") {
+        state.mode = "react";
+      }
+
+      if (["html", "css", "js"].includes(tab)) {
+        state.mode = "html";
+      }
+
+      persistState();
+      renderAll();
+    }
+
+    function renderModeButtons() {
+      document.querySelectorAll("[data-mode]").forEach((button) => {
+        button.classList.toggle("active", button.dataset.mode === state.mode);
+      });
+    }
+
+    function renderTabs() {
+      document.querySelectorAll("[data-tab]").forEach((button) => {
+        const tab = button.dataset.tab;
+        const visible =
+          state.mode === "html"
+            ? ["html", "css", "js"].includes(tab)
+            : state.mode === "react"
+              ? ["jsx", "css"].includes(tab)
+              : false;
+
+        button.style.display = visible ? "inline-flex" : "none";
+        button.classList.toggle("active", state.tab === tab);
+      });
+    }
+
+    function updateEditor() {
+      const value = getCurrentCode();
+      $("codeEditor").value = value;
+
+      const lines = Math.max(1, value.split("\n").length);
+      $("lineNumbers").textContent = Array.from(
+        { length: lines },
+        (_, index) => index + 1
+      ).join("\n");
+
+      $("lineCount").textContent = `${lines} ${lines === 1 ? "linha" : "linhas"}`;
+      $("projectTitle").value = state.title;
+    }
+
+    function renderLayout() {
+      $("editorPanel").classList.toggle("collapsed", state.editorCollapsed);
+      $("expandEditorBtn").style.display = state.editorCollapsed ? "inline-flex" : "none";
+      $("collapseBtn").style.display = state.editorCollapsed ? "none" : "inline-flex";
+
+      $("autoRunBtn").classList.toggle("primary", state.autoRun);
+      $("autoRunBtn").textContent = state.autoRun ? "◉ Ao vivo" : "○ Manual";
+      $("liveIndicator").style.display = state.autoRun ? "inline-flex" : "none";
+
+      const isMobile = window.innerWidth <= 650;
+
+      if (isMobile) {
+        $("editorPanel").classList.toggle("mobile-hidden", state.mobileView !== "editor");
+        $("previewPanel").classList.toggle("mobile-hidden", state.mobileView !== "preview");
+      } else {
+        $("editorPanel").classList.remove("mobile-hidden");
+        $("previewPanel").classList.remove("mobile-hidden");
+      }
+
+      updateSupabaseStatus();
+    }
+
+    function renderAll() {
+      renderModeButtons();
+      renderTabs();
+      updateEditor();
+      renderLayout();
+      renderProjects();
+    }
+
+    function detectCompleteHtml(value) {
+      const text = value.trim().toLowerCase();
+      return (
+        text.startsWith("<!doctype") ||
+        (text.startsWith("<html") && text.includes("</html>"))
+      );
+    }
+
+    function extractCompleteHtml(value) {
+      const lower = value.toLowerCase();
+      const doctype = lower.indexOf("<!doctype");
+      const html = lower.indexOf("<html");
+      const start = doctype >= 0 ? doctype : html;
+
+      return start > 0 ? value.slice(start) : value;
+    }
+
+    function preprocessJsx(code) {
+      return code
+        .replace(/^\s*import\s+React[^;]*;?\s*$/gm, "")
+        .replace(/^\s*import\s+ReactDOM[^;]*;?\s*$/gm, "")
+        .replace(/^\s*import\s+\{[^}]+\}\s+from\s+["']react["'];?\s*$/gm, "")
+        .replace(/^\s*export\s+default\s+function\s+/gm, "function ")
+        .replace(/^\s*export\s+default\s+(\w+);?\s*$/gm, "");
+    }
+
+    function buildReactDocument() {
+      const code = preprocessJsx(state.jsx);
+
+      return `<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"><\/script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"><\/script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
+  <style>${state.css}</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+${code}
+
+try {
+  const root = ReactDOM.createRoot(document.getElementById("root"));
+  root.render(<App />);
+} catch (error) {
+  document.body.innerHTML =
+    "<pre style='color:red;padding:20px;white-space:pre-wrap'>" +
+    error.stack +
+    "</pre>";
+}
+  <\/script>
+</body>
+</html>`;
+    }
+
+    function buildDocument() {
+      if (state.mode === "react") {
+        return buildReactDocument();
+      }
+
+      if (detectCompleteHtml(state.html)) {
+        return extractCompleteHtml(state.html);
+      }
+
+      return `<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>${state.css}</style>
+</head>
+<body>
+  ${state.html}
+  <script>
+try {
+${state.js}
+} catch (error) {
+  document.body.insertAdjacentHTML(
+    "beforeend",
+    "<pre style='color:red;padding:12px;white-space:pre-wrap'>" +
+    error.stack +
+    "</pre>"
+  );
+}
+  <\/script>
+</body>
+</html>`;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    let previewTimer = null;
+
+    function schedulePreview() {
+      window.clearTimeout(previewTimer);
+      previewTimer = window.setTimeout(updatePreview, 350);
+    }
+
+    function updatePreview() {
+      persistState();
+
+      $("previewFrame").hidden = false;
+      $("pythonOutput").hidden = true;
+
+      const blob = new Blob([buildDocument()], {
+        type: "text/html;charset=utf-8"
+      });
+
+      const url = URL.createObjectURL(blob);
+      const oldUrl = $("previewFrame").dataset.objectUrl;
+
+      $("previewFrame").src = url;
+      $("previewFrame").dataset.objectUrl = url;
+
+      if (oldUrl) {
+        window.setTimeout(() => URL.revokeObjectURL(oldUrl), 1000);
+      }
+    }
+
+    function saveLocal() {
+      const record = getProjectRecord("local");
+      const existingIndex = state.localProjects.findIndex(
+        (project) => project.id === state.currentId
+      );
+
+      if (existingIndex >= 0) {
+        record.id = state.currentId;
+        state.localProjects[existingIndex] = record;
+      } else {
+        state.currentId = record.id;
+        state.localProjects.unshift(record);
+      }
+
+      localStorage.setItem(
+        LOCAL_PROJECTS_KEY,
+        JSON.stringify(state.localProjects)
+      );
+
+      persistState();
+      renderProjects();
+      showStatus("success", "Projeto salvo localmente.");
+    }
+
+    function connectSupabase() {
+      const url = $("supabaseUrl").value.trim();
+      const key = $("supabaseKey").value.trim();
+
+      if (!url || !key) {
+        showConfigStatus("Informe a URL e a chave anon.", "error");
+        return false;
+      }
+
+      if (!window.supabase) {
+        showConfigStatus("Biblioteca do Supabase não carregada.", "error");
+        return false;
+      }
+
+      state.supabase = window.supabase.createClient(url, key);
+
+      localStorage.setItem(
+        CONFIG_KEY,
+        JSON.stringify({ url, key })
+      );
+
+      return true;
+    }
+
+    async function testSupabase() {
+      if (!connectSupabase()) return;
+
+      showConfigStatus("Testando tabela snippets...");
+
+      const { error } = await state.supabase
+        .from("snippets")
+        .select("id")
+        .limit(1);
+
+      if (error) {
+        state.supabaseConnected = false;
+        showConfigStatus(
+          "Falha no teste:\n" + error.message,
+          "error"
+        );
+        showStatus("error", "Erro: " + error.message);
+        renderLayout();
+        return;
+      }
+
+      state.supabaseConnected = true;
+      showConfigStatus(
+        "✓ Supabase conectado. Tabela snippets acessível.",
+        "success"
+      );
+
+      showStatus("success", "Conexão confirmada.");
+      renderLayout();
+      await loadCloudProjects();
+    }
+
+    async function saveCloud() {
+      if (!state.supabase && !connectSupabase()) {
+        showStatus("error", "Configure o Supabase antes de salvar.");
+        return;
+      }
+
+      const payload = getProjectPayload();
+
+      let result;
+
+      if (state.currentId && state.currentId.length > 20) {
+        result = await state.supabase
+          .from("snippets")
+          .update(payload)
+          .eq("id", state.currentId)
+          .select("id,title,html,css,js,mode")
+          .single();
+      } else {
+        result = await state.supabase
+          .from("snippets")
+          .insert(payload)
+          .select("id,title,html,css,js,mode")
+          .single();
+      }
+
+      if (result.error) {
+        showStatus(
+          "error",
+          "Erro ao salvar:\n" + result.error.message
+        );
+        return;
+      }
+
+      state.currentId = result.data.id;
+      state.supabaseConnected = true;
+      persistState();
+      renderLayout();
+      await loadCloudProjects();
+      showStatus("success", "Projeto salvo no Supabase.");
+    }
+
+    async function loadCloudProjects() {
+      if (!state.supabase) return;
+
+      const { data, error } = await state.supabase
+        .from("snippets")
+        .select("id,title,html,css,js,mode")
+        .order("title", { ascending: true });
+
+      if (error) {
+        showStatus("error", "Erro ao carregar: " + error.message);
+        return;
+      }
+
+      state.cloudProjects = (data || []).map((project, index) => ({
+        ...project,
+        sequence: index + 1,
+        source: "cloud"
+      }));
+
+      renderProjects();
+    }
+
+    function mergedProjects() {
+      const cloud = state.cloudProjects.map((project) => ({
+        ...project,
+        source: "cloud"
+      }));
+
+      const local = state.localProjects.map((project) => ({
+        ...project,
+        source: "local"
+      }));
+
+      return [...cloud, ...local];
+    }
+
+    function renderProjects() {
+      const term = $("searchInput").value.trim().toLowerCase();
+
+      const projects = mergedProjects().filter((project) =>
+        String(project.title || "").toLowerCase().includes(term)
+      );
+
+      $("projectList").innerHTML = "";
+
+      if (!projects.length) {
+        $("projectList").innerHTML =
+          '<div class="empty">Nenhum projeto encontrado.</div>';
+        return;
+      }
+
+      projects.forEach((project) => {
+        $("projectList").appendChild(createProjectElement(project));
+      });
+
+      renderOpenProjects();
+    }
+
+    function createProjectElement(project) {
+      const item = document.createElement("div");
+      item.className = "project-item";
+
+      const info = document.createElement("div");
+      info.className = "project-info";
+      info.title = "Abrir projeto";
+
+      const name = document.createElement("div");
+      name.className = "project-name";
+      name.textContent =
+        "#" + (project.sequence || "?") + " — " + (project.title || "Sem título");
+
+      const meta = document.createElement("div");
+      meta.className = "project-meta";
+      meta.textContent =
+        (project.source === "cloud" ? "Supabase" : "Local") +
+        " · " +
+        (project.mode || "html").toUpperCase();
+
+      info.append(name, meta);
+      info.addEventListener("click", () => loadProject(project));
+
+      const actions = document.createElement("div");
+      actions.className = "project-actions";
+
+      const rename = document.createElement("button");
+      rename.className = "small-btn";
+      rename.textContent = "✎";
+      rename.title = "Renomear";
+      rename.addEventListener("click", (event) => {
+        event.stopPropagation();
+        renameProject(project);
+      });
+
+      const remove = document.createElement("button");
+      remove.className = "small-btn";
+      remove.textContent = "×";
+      remove.title = "Excluir";
+      remove.addEventListener("click", (event) => {
+        event.stopPropagation();
+        deleteProject(project);
+      });
+
+      actions.append(rename, remove);
+      item.append(info, actions);
+
+      return item;
+    }
+
+    function loadProject(project) {
+      state.currentId = project.id;
+      state.title = project.title || "Sem título";
+      state.mode = project.mode || "html";
+
+      if (state.mode === "react") {
+        state.jsx = project.html || "";
+        state.css = project.css || "";
+        state.tab = "jsx";
+      } else {
+        state.html = project.html || "";
+        state.css = project.css || "";
+        state.js = project.js || "";
+        state.tab = "html";
+      }
+
+      persistState();
+      renderAll();
+      updatePreview();
+      closeOpenModal();
+      showStatus("success", "Projeto aberto: " + state.title);
+    }
+
+    async function deleteProject(project) {
+      if (!confirm("Excluir o projeto \"" + project.title + "\"?")) {
+        return;
+      }
+
+      if (project.source === "cloud" && state.supabase) {
+        const { error } = await state.supabase
+          .from("snippets")
+          .delete()
+          .eq("id", project.id);
+
+        if (error) {
+          showStatus("error", "Erro ao excluir:\n" + error.message);
+          return;
+        }
+
+        await loadCloudProjects();
+        showStatus("success", "Projeto excluído do Supabase.");
+        return;
+      }
+
+      state.localProjects = state.localProjects.filter(
+        (item) => item.id !== project.id
+      );
+
+      localStorage.setItem(
+        LOCAL_PROJECTS_KEY,
+        JSON.stringify(state.localProjects)
+      );
+
+      renderProjects();
+      showStatus("success", "Projeto local excluído.");
+    }
+
+    async function renameProject(project) {
+      const title = prompt("Novo nome do projeto:", project.title);
+      if (!title || !title.trim()) return;
+
+      if (project.source === "cloud" && state.supabase) {
+        const { error } = await state.supabase
+          .from("snippets")
+          .update({ title: title.trim() })
+          .eq("id", project.id);
+
+        if (error) {
+          showStatus("error", "Erro ao renomear:\n" + error.message);
+          return;
+        }
+
+        await loadCloudProjects();
+        return;
+      }
+
+      const local = state.localProjects.find(
+        (item) => item.id === project.id
+      );
+
+      if (local) {
+        local.title = title.trim();
+        localStorage.setItem(
+          LOCAL_PROJECTS_KEY,
+          JSON.stringify(state.localProjects)
+        );
+        renderProjects();
+      }
+    }
+
+    function renderOpenProjects() {
+      const term = $("openSearchInput").value.trim().toLowerCase();
+      const container = $("openProjectList");
+      container.innerHTML = "";
+
+      const projects = mergedProjects().filter((project) =>
+        String(project.title || "").toLowerCase().includes(term)
+      );
+
+      if (!projects.length) {
+        container.innerHTML =
+          '<div class="empty">Nenhum projeto encontrado.</div>';
+        return;
+      }
+
+      projects.forEach((project) => {
+        container.appendChild(createProjectElement(project));
+      });
+    }
+
+    function openOpenModal() {
+      $("openModal").classList.add("open");
+      renderOpenProjects();
+    }
+
+    function closeOpenModal() {
+      $("openModal").classList.remove("open");
+    }
+
+    function downloadFile(filename, content, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function downloadCurrent() {
+      let content;
+      let extension;
+
+      if (state.mode === "react") {
+        content = state.jsx;
+        extension = "jsx";
+      } else {
+        content = buildDocument();
+        extension = "html";
+      }
+
+      const filename =
+        (state.title.trim() || "playground")
+          .replace(/[^\wÀ-ÿ -]/g, "")
+          .replace(/\s+/g, "-") +
+        "." +
+        extension;
+
+      downloadFile(filename, content, "text/plain;charset=utf-8");
+      showStatus("success", "Arquivo baixado.");
+    }
+
+    async function copyCurrent() {
+      try {
+        await navigator.clipboard.writeText(buildDocument());
+        showStatus("success", "Código copiado.");
+      } catch {
+        showStatus("error", "Não foi possível copiar automaticamente.");
+      }
+    }
+
+    function importFile(file) {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        const content = String(reader.result || "");
+        const extension = file.name.split(".").pop().toLowerCase();
+
+        state.title = file.name.replace(/\.[^.]+$/, "") || "Importado";
+
+        if (["jsx", "tsx"].includes(extension)) {
+          state.mode = "react";
+          state.tab = "jsx";
+          state.jsx = content;
+        } else if (extension === "css") {
+          state.mode = "html";
+          state.tab = "css";
+          state.css = content;
+        } else if (extension === "js") {
+          state.mode = "html";
+          state.tab = "js";
+          state.js = content;
+        } else {
+          state.mode = "html";
+          state.tab = "html";
+          state.html = detectCompleteHtml(content)
+            ? extractCompleteHtml(content)
+            : content;
+
+          if (detectCompleteHtml(content)) {
+            state.css = "";
+            state.js = "";
+          }
+        }
+
+        state.currentId = null;
+        persistState();
+        renderAll();
+        updatePreview();
+        showStatus("success", "Arquivo importado: " + file.name);
+      };
+
+      reader.readAsText(file);
+    }
+
+    function resetCurrent() {
+      if (state.mode === "react") {
+        state.jsx = DEFAULT_JSX;
+      } else {
+        state.html = DEFAULT_HTML;
+        state.css = DEFAULT_CSS;
+        state.js = DEFAULT_JS;
+      }
+
+      state.title = "Sem título";
+      state.currentId = null;
+      persistState();
+      renderAll();
+      updatePreview();
+      showStatus("success", "Conteúdo restaurado.");
+    }
+
+    function clearCurrent() {
+      if (state.mode === "react") {
+        state.jsx = "";
+      } else {
+        state.html = "";
+        state.css = "";
+        state.js = "";
+      }
+
+      persistState();
+      renderAll();
+      updatePreview();
+      showStatus("info", "Editor limpo.");
+    }
+
+    function openFullscreen() {
+      const blob = new Blob([buildDocument()], {
+        type: "text/html;charset=utf-8"
+      });
+
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+
+      window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
+
+    function toggleTheme() {
+      const isLight = document.documentElement.classList.toggle("light");
+      localStorage.setItem("playground_theme", isLight ? "light" : "dark");
+      $("themeBtn").textContent = isLight ? "☀" : "☾";
+    }
+
+    function applyTheme() {
+      const theme = localStorage.getItem("playground_theme") || "dark";
+      document.documentElement.classList.toggle("light", theme === "light");
+      $("themeBtn").textContent = theme === "light" ? "☀" : "☾";
+    }
+
+    function bindEvents() {
+      document.querySelectorAll("[data-mode]").forEach((button) => {
+        button.addEventListener("click", () => setMode(button.dataset.mode));
+      });
+
+      document.querySelectorAll("[data-tab]").forEach((button) => {
+        button.addEventListener("click", () => setTab(button.dataset.tab));
+      });
+
+      $("projectTitle").addEventListener("input", (event) => {
+        state.title = event.target.value;
+        persistState();
+      });
+
+      $("codeEditor").addEventListener("input", (event) => {
+        setCurrentCode(event.target.value);
+      });
+
+      $("codeEditor").addEventListener("paste", (event) => {
+        if (state.tab !== "html") return;
+
+        const pasted = event.clipboardData.getData("text");
+
+        if (detectCompleteHtml(pasted)) {
+          event.preventDefault();
+          state.html = extractCompleteHtml(pasted);
+          state.css = "";
+          state.js = "";
+          persistState();
+          renderAll();
+          updatePreview();
+          showStatus("info", "Documento HTML completo detectado.");
+        }
+      });
+
+      $("autoRunBtn").addEventListener("click", () => {
+        state.autoRun = !state.autoRun;
+        persistState();
+        renderLayout();
+
+        if (state.autoRun) {
+          updatePreview();
+        }
+      });
+
+      $("runBtn").addEventListener("click", updatePreview);
+      $("saveLocalBtn").addEventListener("click", saveLocal);
+      $("saveCloudBtn").addEventListener("click", saveCloud);
+      $("openBtn").addEventListener("click", openOpenModal);
+      $("closeOpenBtn").addEventListener("click", closeOpenModal);
+      $("configBtn").addEventListener("click", () => $("configModal").classList.add("open"));
+      $("closeConfigBtn").addEventListener("click", () => $("configModal").classList.remove("open"));
+      $("testSupabaseBtn").addEventListener("click", testSupabase);
+
+      $("clearSupabaseBtn").addEventListener("click", () => {
+        $("supabaseUrl").value = "";
+        $("supabaseKey").value = "";
+        state.supabase = null;
+        state.supabaseConnected = false;
+        localStorage.removeItem(CONFIG_KEY);
+        showConfigStatus("Configuração removida.");
+        renderLayout();
+      });
+
+      $("copyBtn").addEventListener("click", copyCurrent);
+      $("downloadBtn").addEventListener("click", downloadCurrent);
+      $("fullscreenBtn").addEventListener("click", openFullscreen);
+      $("resetBtn").addEventListener("click", resetCurrent);
+      $("clearBtn").addEventListener("click", clearCurrent);
+      $("themeBtn").addEventListener("click", toggleTheme);
+
+      $("collapseBtn").addEventListener("click", () => {
+        state.editorCollapsed = true;
+        persistState();
+        renderLayout();
+      });
+
+      $("expandEditorBtn").addEventListener("click", () => {
+        state.editorCollapsed = false;
+        persistState();
+        renderLayout();
+      });
+
+      $("importBtn").addEventListener("click", () => $("fileInput").click());
+
+      $("fileInput").addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (file) importFile(file);
+        event.target.value = "";
+      });
+
+      $("searchInput").addEventListener("input", renderProjects);
+      $("openSearchInput").addEventListener("input", renderOpenProjects);
+
+      $("mobileEditorBtn").addEventListener("click", () => {
+        state.mobileView = "editor";
+        renderLayout();
+      });
+
+      $("mobilePreviewBtn").addEventListener("click", () => {
+        state.mobileView = "preview";
+        updatePreview();
+        renderLayout();
+      });
+
+      $("refreshBtn").addEventListener("click", async () => {
+        if (state.supabase && state.supabaseConnected) {
+          await loadCloudProjects();
+          showStatus("success", "Projetos atualizados.");
+        } else {
+          renderProjects();
+          showStatus("success", "Projetos atualizados.");
+        }
+      });
+
+      window.addEventListener("resize", renderLayout);
+    }
+
+    async function startup() {
+      applyTheme();
+      bindEvents();
+      loadState();
+      updatePreview();
+
+      const config = safeJsonParse(localStorage.getItem(CONFIG_KEY), {});
+      if (config.url && config.key) {
+        state.supabase = window.supabase?.createClient(config.url, config.key);
+        state.supabaseConnected = true;
+        renderLayout();
+        await loadCloudProjects();
+      }
+    }
+
+    startup();
+  </script>
+</body>
+</html>
