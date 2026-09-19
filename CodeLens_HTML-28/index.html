@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>CodeLens</title>
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#0d1117"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<link rel="icon" href="icons/icon-192.png"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+<style>
+/* ── Reset & Base ───────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0d1117; --surface:#161b22; --surface2:#1c2128;
+  --border:#30363d; --text:#e6edf3; --muted:#8b949e;
+  --blue:#58a6ff; --green:#3fb950; --red:#f85149; --yellow:#d29922;
+  --blue-bg:#1f6feb; --green-bg:#238636;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  overflow:hidden;}
+
+/* ── Layout ────────────────────────────────────────── */
+#app{display:flex;flex-direction:column;height:100dvh;}
+#topbar{display:flex;align-items:center;height:44px;background:var(--surface);
+  border-bottom:1px solid var(--border);padding:0 12px;gap:6px;flex-shrink:0;}
+#main{flex:1;display:flex;overflow:hidden;}
+
+/* ── Topbar ────────────────────────────────────────── */
+.logo{font-size:14px;font-weight:700;color:var(--blue);margin-right:8px;}
+.nav-btn{background:none;border:none;color:var(--muted);padding:5px 10px;
+  border-radius:5px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;}
+.nav-btn.active{color:var(--text);border-bottom-color:var(--blue);}
+.nav-btn:hover:not(.active){background:var(--surface2);color:var(--text);}
+.topbar-right{margin-left:auto;display:flex;gap:6px;align-items:center;}
+.btn{padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;border:none;cursor:pointer;}
+.btn-blue{background:var(--blue-bg);color:#fff;}
+.btn-gray{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.btn-green{background:var(--green-bg);color:#fff;}
+.btn-red{background:#da3633;color:#fff;}
+.btn:hover{opacity:.85;}
+
+/* ── Sections ──────────────────────────────────────── */
+.section{display:none;flex:1;flex-direction:column;overflow:hidden;}
+.section.active{display:flex;}
+
+/* ── HOME ──────────────────────────────────────────── */
+#home{overflow-y:auto;align-items:center;}
+.home-inner{width:100%;max-width:860px;padding:28px 20px;margin:0 auto;}
+.home-inner h2{font-size:18px;font-weight:700;margin-bottom:4px;}
+.home-inner p{color:var(--muted);font-size:13px;margin-bottom:24px;}
+.home-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-bottom:24px;}
+.home-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:18px;cursor:pointer;transition:.15s;}
+.home-card:hover{border-color:var(--blue);background:#0d1f40;}
+.home-card .icon{font-size:28px;margin-bottom:10px;}
+.home-card h3{font-size:14px;font-weight:700;margin-bottom:5px;}
+.home-card p{font-size:12px;color:var(--muted);line-height:1.5;}
+/* Status bar */
+.status-bar{display:flex;gap:14px;font-size:11px;color:var(--muted);
+  padding:8px 0;border-top:1px solid var(--border);margin-top:20px;flex-wrap:wrap;}
+.status-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px;}
+
+/* ── EDITOR ────────────────────────────────────────── */
+#editor-section{flex-direction:row;}
+/* Sidebar */
+.sidebar{width:210px;flex-shrink:0;border-right:1px solid var(--border);
+  display:flex;flex-direction:column;background:var(--surface);}
+.sidebar.hidden{display:none;}
+.sb-header{display:flex;align-items:center;gap:4px;padding:6px;
+  border-bottom:1px solid var(--border);flex-shrink:0;}
+.sb-title{font-size:11px;font-weight:600;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sb-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:3px 5px;font-size:13px;border-radius:4px;}
+.sb-btn:hover{background:var(--surface2);color:var(--text);}
+#file-tree{flex:1;overflow-y:auto;padding:4px 0;}
+.tree-item{display:flex;align-items:center;gap:5px;padding:4px 8px;
+  cursor:pointer;font-size:12px;border-radius:4px;margin:1px 4px;color:var(--muted);}
+.tree-item:hover,.tree-item.active{background:var(--surface2);color:var(--text);}
+.tree-item .del{margin-left:auto;background:none;border:none;color:var(--red);
+  cursor:pointer;opacity:0;font-size:11px;padding:0 2px;}
+.tree-item:hover .del{opacity:1;}
+/* Editor main */
+.ed-main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+.ed-toolbar{display:flex;align-items:center;gap:6px;padding:5px 8px;
+  background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+.ed-filename{font-size:12px;font-family:monospace;color:var(--blue);}
+.ed-info{font-size:11px;color:var(--muted);}
+.ed-body{flex:1;display:flex;overflow:hidden;}
+textarea.code{flex:1;background:#0a0e14;color:var(--text);border:none;resize:none;
+  padding:12px;font-family:'Courier New',Courier,monospace;font-size:13px;
+  line-height:1.6;outline:none;tab-size:2;}
+/* Preview pane */
+.preview-pane{width:42%;border-left:1px solid var(--border);display:flex;flex-direction:column;}
+.preview-pane.hidden{display:none;}
+.pane-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:4px 8px;font-size:11px;color:var(--muted);background:#0a0e14;
+  border-bottom:1px solid var(--border);flex-shrink:0;}
+.pane-hdr button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;}
+iframe.preview{flex:1;border:none;background:#fff;}
+/* AI pane */
+.ai-pane{width:270px;border-left:1px solid var(--border);display:flex;flex-direction:column;}
+.ai-pane.hidden{display:none;}
+.ai-msgs{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;}
+.ai-m{padding:7px 9px;border-radius:6px;font-size:12px;line-height:1.5;}
+.ai-m.user{background:var(--surface2);border-left:2px solid var(--blue);}
+.ai-m.assistant{background:var(--surface);border-left:2px solid var(--green);}
+.ai-m pre{background:#0a0e14;padding:6px;border-radius:4px;overflow-x:auto;font-size:11px;margin:4px 0;}
+.ai-m code{font-family:monospace;font-size:11px;}
+.ai-inp{padding:7px;border-top:1px solid var(--border);}
+.ai-inp textarea{width:100%;background:#0a0e14;border:1px solid var(--border);
+  color:var(--text);border-radius:5px;padding:6px;font-size:12px;resize:none;font-family:inherit;}
+
+/* ── PLAYGROUND ────────────────────────────────────── */
+#pg-section{flex-direction:column;}
+.pg-toolbar{display:flex;align-items:center;gap:6px;padding:5px 10px;
+  background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+.tab-group{display:flex;border-radius:5px;overflow:hidden;border:1px solid var(--border);}
+.tab-group button{padding:4px 11px;font-size:11px;border:none;
+  background:transparent;color:var(--muted);cursor:pointer;}
+.tab-group button.active{background:var(--blue-bg);color:#fff;}
+.pg-body{flex:1;display:flex;overflow:hidden;}
+.pg-editor{flex:1;display:flex;flex-direction:column;border-right:1px solid var(--border);}
+.pg-preview{flex:1;display:flex;flex-direction:column;}
+/* Snippets drawer */
+.snip-drawer{width:190px;border-left:1px solid var(--border);display:flex;flex-direction:column;}
+.snip-drawer.hidden{display:none;}
+.snip-item{display:flex;align-items:center;padding:7px 9px;cursor:pointer;
+  font-size:11px;border-bottom:1px solid var(--border);gap:4px;}
+.snip-item:hover{background:var(--surface2);}
+.snip-item .sn-del{margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer;opacity:0;}
+.snip-item:hover .sn-del{opacity:1;}
+
+/* ── CHAT ──────────────────────────────────────────── */
+#chat-section{flex-direction:column;}
+.chat-bar{display:flex;align-items:center;gap:6px;padding:5px 10px;
+  background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+.chat-body{display:flex;flex:1;overflow:hidden;}
+.chat-sidebar{width:190px;border-right:1px solid var(--border);display:flex;flex-direction:column;}
+.chat-sidebar.hidden{display:none;}
+.conv-item{padding:8px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border);color:var(--muted);}
+.conv-item:hover,.conv-item.active{background:var(--surface2);color:var(--text);}
+#chat-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;}
+.cm{padding:10px 12px;border-radius:8px;font-size:13px;line-height:1.6;}
+.cm.user{background:var(--surface2);border-left:3px solid var(--blue);align-self:flex-end;max-width:85%;}
+.cm.assistant{background:var(--surface);border-left:3px solid var(--green);}
+.cm pre{background:#0a0e14;padding:8px;border-radius:4px;overflow-x:auto;margin:6px 0;font-size:12px;}
+.chat-input{padding:8px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;}
+.chat-input-row{display:flex;gap:6px;}
+#chat-prompt{flex:1;resize:none;padding:8px 10px;border-radius:6px;
+  font-size:13px;max-height:100px;min-height:38px;background:#0a0e14;
+  border:1px solid var(--border);color:var(--text);}
+#chat-prompt:focus{outline:none;border-color:var(--blue);}
+/* TTS bar */
+#tts-bar{display:none;align-items:center;gap:8px;padding:4px 10px;
+  background:#0a0e14;border-top:1px solid var(--border);font-size:12px;color:var(--muted);}
+input[type=range]{accent-color:var(--blue);}
+
+/* ── CONFIG ────────────────────────────────────────── */
+#cfg-section{overflow-y:auto;}
+.cfg-inner{max-width:520px;margin:0 auto;padding:24px 16px;}
+.cfg-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:16px;margin-bottom:14px;}
+.cfg-card h3{font-size:13px;font-weight:600;margin-bottom:12px;}
+.cfg-row{display:flex;gap:6px;margin-bottom:8px;}
+.cfg-row input{flex:1;background:#0a0e14;border:1px solid var(--border);
+  color:var(--text);border-radius:5px;padding:7px 9px;font-size:13px;font-family:inherit;}
+.cfg-row input:focus{outline:none;border-color:var(--blue);}
+.key-slot{background:#0a0e14;border:1px solid var(--border);border-radius:5px;
+  padding:8px;margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+.key-slot input{flex:1;background:transparent;border:none;color:var(--text);
+  font-size:12px;font-family:monospace;outline:none;}
+
+/* ── Shared ────────────────────────────────────────── */
+.dot-anim span{animation:blink 1.2s infinite;display:inline-block;
+  width:5px;height:5px;border-radius:50%;background:var(--green);margin:0 1px;}
+.dot-anim span:nth-child(2){animation-delay:.2s;}
+.dot-anim span:nth-child(3){animation-delay:.4s;}
+@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+#toast{position:fixed;bottom:20px;right:20px;padding:8px 16px;border-radius:6px;
+  font-size:13px;color:#fff;display:none;z-index:999;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+select{background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);border-radius:5px;padding:4px 8px;font-size:12px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- TOP BAR -->
+  <div id="topbar">
+    <span class="logo">⚡ CodeLens</span>
+    <button class="nav-btn active" onclick="go('home')">🏠</button>
+    <button class="nav-btn" onclick="go('editor')">💻 Editor</button>
+    <button class="nav-btn" onclick="go('pg')">🎨 Playground</button>
+    <button class="nav-btn" onclick="go('chat')">💬 Chat IA</button>
+    <button class="nav-btn" onclick="go('cfg')">⚙️ Config</button>
+    <div class="topbar-right">
+      <span id="ai-badge" style="font-size:11px;color:var(--muted);"></span>
+      <span id="user-badge" style="font-size:11px;color:var(--muted);"></span>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="main">
+
+    <!-- ══════ HOME ══════ -->
+    <section id="home" class="section active">
+      <div class="home-inner">
+        <h2>CodeLens</h2>
+        <p>Editor de código · Playground · Chat com IA · Salva no Supabase</p>
+        <div class="home-cards">
+          <div class="home-card" onclick="go('editor')">
+            <div class="icon">💻</div>
+            <h3>Editor de Código</h3>
+            <p>Árvore de arquivos, preview ao vivo para HTML, importar/exportar ZIP, GitHub.</p>
+          </div>
+          <div class="home-card" onclick="go('pg')">
+            <div class="icon">🎨</div>
+            <h3>Playground</h3>
+            <p>HTML · CSS · JS em abas, preview ao vivo, salvar snippets, baixar .html.</p>
+          </div>
+          <div class="home-card" onclick="go('chat')">
+            <div class="icon">💬</div>
+            <h3>Chat com IA</h3>
+            <p>Gemini, Groq, OpenAI. TTS com velocidade, memória, histórico no Supabase.</p>
+          </div>
+          <div class="home-card" onclick="go('cfg')">
+            <div class="icon">⚙️</div>
+            <h3>Configurações</h3>
+            <p>Supabase, chaves de IA, GitHub, login com email e senha.</p>
+          </div>
+        </div>
+        <div class="status-bar">
+          <span><span class="status-dot" id="sb-dot" style="background:var(--muted)"></span>Supabase: <span id="sb-lbl">—</span></span>
+          <span><span class="status-dot" id="ai-dot" style="background:var(--muted)"></span>IA: <span id="ai-lbl">—</span></span>
+          <span id="user-lbl"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════ EDITOR ══════ -->
+    <section id="editor-section" class="section">
+      <!-- Sidebar -->
+      <div class="sidebar" id="ed-sidebar">
+        <div class="sb-header">
+          <span class="sb-title" id="ed-proj-name">sem projeto</span>
+          <button class="sb-btn" onclick="newEdFile()" title="Novo arquivo">+</button>
+          <button class="sb-btn" onclick="importZip()" title="Importar ZIP">⬆</button>
+          <button class="sb-btn" onclick="exportZip()" title="Exportar ZIP">⬇</button>
+        </div>
+        <div id="file-tree"></div>
+      </div>
+      <!-- Editor main -->
+      <div class="ed-main">
+        <div class="ed-toolbar">
+          <button class="btn btn-gray" style="font-size:11px;padding:4px 8px;" onclick="toggleSidebar()">☰</button>
+          <span class="ed-filename" id="ed-fname">sem arquivo</span>
+          <span class="ed-info" id="ed-info"></span>
+          <div style="margin-left:auto;display:flex;gap:4px;">
+            <button class="btn btn-gray" style="font-size:11px;" onclick="saveEdFile()">💾 Salvar</button>
+            <button class="btn btn-gray" style="font-size:11px;" onclick="pushGitHub()">🔀 GitHub</button>
+            <button class="btn btn-gray" style="font-size:11px;" onclick="togglePreview()">👁 Preview</button>
+            <button class="btn btn-gray" style="font-size:11px;" onclick="toggleAIPane()">🤖 IA</button>
+          </div>
+        </div>
+        <div class="ed-body">
+          <textarea class="code" id="ed-code" spellcheck="false"
+            oninput="onEdEdit()" onkeydown="handleTabKey(event,this)"
+            placeholder="Abra um arquivo da árvore..."></textarea>
+          <!-- Preview -->
+          <div class="preview-pane hidden" id="ed-preview">
+            <div class="pane-hdr">
+              <span>👁 Preview ao vivo</span>
+              <button onclick="expandPreview()">↔</button>
+            </div>
+            <iframe class="preview" id="ed-iframe" sandbox="allow-scripts allow-modals allow-forms"></iframe>
+          </div>
+          <!-- AI Pane -->
+          <div class="ai-pane hidden" id="ai-pane">
+            <div class="pane-hdr">
+              <span>🤖 Assistente</span>
+              <button onclick="clearEdAI()">🗑</button>
+            </div>
+            <div class="ai-msgs" id="ai-msgs"></div>
+            <div class="ai-inp">
+              <textarea id="ai-ed-prompt" rows="3"
+                placeholder="Pergunte sobre o código... (Ctrl+Enter)"
+                onkeydown="if(event.ctrlKey&&event.key==='Enter'){sendEdAI();event.preventDefault();}"></textarea>
+              <div style="display:flex;justify-content:flex-end;margin-top:4px;">
+                <button class="btn btn-blue" style="font-size:11px;padding:4px 10px;" onclick="sendEdAI()">▶</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <input type="file" id="zip-input" accept=".zip" style="display:none" onchange="handleZipImport(event)">
+    </section>
+
+    <!-- ══════ PLAYGROUND ══════ -->
+    <section id="pg-section" class="section">
+      <div class="pg-toolbar">
+        <div class="tab-group">
+          <button id="pg-tab-html" class="active" onclick="setPgTab('html')">HTML</button>
+          <button id="pg-tab-css" onclick="setPgTab('css')">CSS</button>
+          <button id="pg-tab-js" onclick="setPgTab('js')">JS</button>
+        </div>
+        <input type="text" id="pg-title" placeholder="Nome do snippet..."
+          style="background:#0a0e14;border:1px solid var(--border);color:var(--text);
+          border-radius:5px;padding:4px 9px;font-size:12px;width:160px;">
+        <button class="btn btn-blue" onclick="runPg()">▶ Run</button>
+        <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:3px;">
+          <input type="checkbox" id="pg-auto" checked style="accent-color:var(--blue);">Auto</label>
+        <button class="btn btn-green" onclick="savePg()">💾 Salvar</button>
+        <button class="btn btn-gray" onclick="downloadPg()">⬇ .html</button>
+        <button class="btn btn-gray" onclick="fullscreenPg()">⛶</button>
+        <button class="btn btn-gray" onclick="toggleSnippets()">📂 Salvos</button>
+      </div>
+      <div class="pg-body">
+        <div class="pg-editor">
+          <div class="pane-hdr"><span id="pg-lbl">✏️ HTML</span></div>
+          <textarea class="code" id="pg-editor" spellcheck="false"
+            oninput="onPgEdit()" onkeydown="handleTabKey(event,this)"
+            placeholder="Digite seu código..."></textarea>
+        </div>
+        <div class="pg-preview">
+          <div class="pane-hdr">👁 Preview ao vivo</div>
+          <iframe class="preview" id="pg-iframe" sandbox="allow-scripts allow-modals allow-forms allow-popups"></iframe>
+        </div>
+        <div class="snip-drawer hidden" id="snip-drawer">
+          <div class="pane-hdr"><span>Snippets</span></div>
+          <div id="snip-list" style="flex:1;overflow-y:auto;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════ CHAT ══════ -->
+    <section id="chat-section" class="section">
+      <div class="chat-bar">
+        <button class="btn btn-gray" style="font-size:11px;" onclick="toggleChatSidebar()">☰</button>
+        <select id="ctx-sel">
+          <option value="2000">2k ctx</option>
+          <option value="4000" selected>4k ctx</option>
+          <option value="8000">8k ctx</option>
+          <option value="16000">16k ctx</option>
+          <option value="32000">32k ctx</option>
+        </select>
+        <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:3px;">
+          <input type="checkbox" id="use-tts" onchange="toggleTTSBar()" style="accent-color:var(--blue);">🔊 Voz</label>
+        <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:3px;">
+          <input type="checkbox" id="use-mem" checked style="accent-color:var(--blue);">🧠 Memória</label>
+        <span id="mem-lbl" style="font-size:11px;color:var(--muted);background:var(--surface2);
+          padding:2px 8px;border-radius:4px;"></span>
+        <div style="margin-left:auto;display:flex;gap:4px;">
+          <button class="btn btn-gray" style="font-size:11px;" onclick="newChatConv()">+ Nova</button>
+          <button class="btn btn-gray" style="font-size:11px;" onclick="clearChatMsgs()">🗑</button>
+          <button class="btn btn-gray" style="font-size:11px;" onclick="exportChat()">⬇</button>
+        </div>
+      </div>
+      <div class="chat-body">
+        <div class="chat-sidebar hidden" id="chat-sidebar">
+          <div class="pane-hdr">Conversas
+            <button onclick="newChatConv()" style="background:none;border:none;color:var(--muted);cursor:pointer;">+</button>
+          </div>
+          <div id="conv-list" style="flex:1;overflow-y:auto;"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+          <div id="chat-msgs"></div>
+          <div id="tts-bar">
+            <span>Velocidade:</span>
+            <input type="range" id="tts-speed" min="0.5" max="2" step="0.05" value="1.1"
+              oninput="document.getElementById('tts-lbl').textContent=parseFloat(this.value).toFixed(2)+'x'">
+            <span id="tts-lbl">1.10x</span>
+            <button onclick="stopTTS()" style="margin-left:auto;background:#da3633;color:#fff;
+              border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:11px;">⏹</button>
+          </div>
+          <div class="chat-input">
+            <div class="chat-input-row">
+              <textarea id="chat-prompt" rows="2"
+                placeholder="Mensagem... (Ctrl+Enter envia)"
+                onkeydown="if(event.ctrlKey&&event.key==='Enter'){sendChatMsg();event.preventDefault();}"></textarea>
+              <button class="btn btn-blue" id="chat-send" onclick="sendChatMsg()">▶</button>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px;" id="chat-ai-info">IA não configurada</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════ CONFIG ══════ -->
+    <section id="cfg-section" class="section">
+      <div class="cfg-inner">
+        <div class="cfg-card">
+          <h3>🗄 Supabase <span style="font-size:11px;color:var(--muted);">(banco de dados na nuvem)</span></h3>
+          <div class="cfg-row">
+            <input type="text" id="cfg-sb-url" placeholder="URL — https://xxx.supabase.co">
+          </div>
+          <div class="cfg-row">
+            <input type="password" id="cfg-sb-key" placeholder="Anon key — eyJ...">
+            <button class="btn btn-blue" onclick="saveSB()">Salvar</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);">
+            <a href="https://supabase.com/dashboard" target="_blank" style="color:var(--blue);">supabase.com</a>
+            → seu projeto → Settings → API
+          </div>
+        </div>
+
+        <div class="cfg-card">
+          <h3>🤖 Chaves de IA</h3>
+          <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">
+            Gemini grátis: <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--blue);">AIza...</a> &nbsp;·&nbsp;
+            Groq grátis: <a href="https://console.groq.com/keys" target="_blank" style="color:var(--blue);">gsk_...</a>
+          </p>
+          <div id="key-slots"></div>
+          <div class="cfg-row">
+            <input type="text" id="new-key-input" placeholder="Cole sua chave aqui (AIza... / gsk_ / sk-...)">
+            <button class="btn btn-green" onclick="addKey()">+ Adicionar</button>
+          </div>
+        </div>
+
+        <div class="cfg-card">
+          <h3>🔀 GitHub</h3>
+          <div class="cfg-row">
+            <input type="password" id="cfg-gh-token" placeholder="Token — ghp_...">
+            <input type="text" id="cfg-gh-repo" placeholder="usuario/repo">
+            <button class="btn btn-blue" onclick="saveGH()">Salvar</button>
+          </div>
+        </div>
+
+        <div class="cfg-card">
+          <h3>👤 Conta <span style="font-size:11px;color:var(--muted);">(requer Supabase)</span></h3>
+          <div class="cfg-row">
+            <input type="email" id="cfg-email" placeholder="email@exemplo.com">
+            <input type="password" id="cfg-pass" placeholder="senha">
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:8px;">
+            <button class="btn btn-blue" onclick="doLogin()">Entrar</button>
+            <button class="btn btn-gray" onclick="doRegister()">Criar conta</button>
+            <button class="btn btn-gray" onclick="doReset()">Esqueci a senha</button>
+            <button class="btn btn-red" onclick="doLogout()">Sair</button>
+          </div>
+          <div id="auth-msg" style="font-size:12px;"></div>
+        </div>
+
+        <div class="cfg-card" style="background:#0a0e14;">
+          <h3 style="color:var(--yellow);">📋 SQL para rodar no Supabase</h3>
+          <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Cole isso no SQL Editor do Supabase e clique Run:</p>
+          <textarea readonly style="width:100%;height:200px;background:#161b22;border:1px solid var(--border);
+            color:var(--muted);border-radius:5px;padding:8px;font-size:11px;font-family:monospace;resize:none;"
+            id="sql-box"></textarea>
+          <button class="btn btn-gray" style="margin-top:6px;font-size:11px;" onclick="copySql()">📋 Copiar SQL</button>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<div id="toast"></div>
+<script src="app.js" defer></script>
+</body>
+</html>
