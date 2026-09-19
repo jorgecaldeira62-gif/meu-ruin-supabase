@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>MeuIDE</title>
+<link rel="manifest" href="manifest.json"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;min-height:100dvh;}
+/* Nav */
+nav{display:flex;align-items:center;padding:0 16px;height:52px;background:#161b22;border-bottom:1px solid #30363d;}
+.logo{font-size:16px;font-weight:700;color:#58a6ff;margin-right:auto;}
+.nav-links{display:flex;gap:4px;}
+.nav-link{color:#8b949e;font-size:13px;text-decoration:none;padding:6px 12px;border-radius:6px;display:flex;align-items:center;gap:6px;}
+.nav-link:hover{color:#e6edf3;background:#21262d;}
+.nav-link.active{color:#e6edf3;background:#21262d;}
+.nav-right{display:flex;gap:8px;margin-left:16px;align-items:center;}
+.btn{padding:6px 14px;border-radius:6px;font-size:13px;font-weight:600;border:none;cursor:pointer;}
+.btn-blue{background:#1f6feb;color:#fff;}
+.btn-gray{background:#21262d;color:#e6edf3;border:1px solid #30363d;}
+/* Conteúdo */
+.content{padding:0;height:calc(100dvh - 52px);display:flex;flex-direction:column;}
+/* Cards de módulos (tela inicial) */
+.home{padding:32px 24px;max-width:900px;margin:0 auto;width:100%;}
+.home h2{font-size:20px;font-weight:700;margin-bottom:6px;}
+.home p{color:#8b949e;font-size:14px;margin-bottom:28px;}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;}
+.card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:20px;cursor:pointer;text-decoration:none;display:block;transition:.15s;}
+.card:hover{border-color:#58a6ff;background:#0d1f40;}
+.card-icon{font-size:32px;margin-bottom:12px;}
+.card-title{font-size:15px;font-weight:700;color:#e6edf3;margin-bottom:6px;}
+.card-desc{font-size:12px;color:#8b949e;line-height:1.5;}
+.card-badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:4px;margin-top:10px;font-weight:600;}
+/* Config panel */
+.cfg-panel{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:20px;margin-top:20px;}
+.cfg-panel h3{font-size:14px;font-weight:600;margin-bottom:14px;color:#d29922;}
+.cfg-row{display:flex;gap:8px;margin-bottom:10px;}
+.cfg-row input{flex:1;background:#0a0e14;border:1px solid #30363d;color:#e6edf3;border-radius:6px;padding:8px 10px;font-size:13px;font-family:monospace;}
+.cfg-row input:focus{outline:none;border-color:#58a6ff;}
+/* Status */
+.status-bar{display:flex;align-items:center;gap:12px;padding:8px 24px;background:#0a0e14;border-top:1px solid #30363d;font-size:12px;color:#8b949e;flex-shrink:0;}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px;}
+.dot-green{background:#3fb950;} .dot-red{background:#f85149;} .dot-gray{background:#8b949e;}
+/* Toast */
+#toast{position:fixed;bottom:20px;right:20px;padding:8px 16px;border-radius:6px;font-size:13px;color:#fff;display:none;z-index:99;}
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">⚡ MeuIDE</span>
+  <div class="nav-links">
+    <a class="nav-link active" href="index.html">🏠 Início</a>
+    <a class="nav-link" href="editor.html">💻 Editor</a>
+    <a class="nav-link" href="playground.html">🎨 Playground</a>
+    <a class="nav-link" href="chat.html">💬 Chat IA</a>
+  </div>
+  <div class="nav-right">
+    <span id="user-badge" style="font-size:12px;color:#8b949e;"></span>
+    <button class="btn btn-gray" onclick="toggleConfig()">⚙️ Config</button>
+    <button class="btn btn-gray" id="login-btn" onclick="doLogin()" style="display:none;">Entrar</button>
+    <button class="btn btn-gray" id="logout-btn" onclick="doLogout()" style="display:none;">Sair</button>
+  </div>
+</nav>
+
+<div class="content">
+  <div style="flex:1;overflow-y:auto;">
+    <div class="home">
+      <h2>Bem-vindo ao MeuIDE</h2>
+      <p>Escolha um módulo para começar. Todos salvam no Supabase quando configurado.</p>
+
+      <div class="cards">
+        <a class="card" href="editor.html">
+          <div class="card-icon">💻</div>
+          <div class="card-title">Editor de Código</div>
+          <div class="card-desc">Edite arquivos HTML, CSS, JS e mais. Árvore de arquivos, preview ao vivo, importar/exportar ZIP, enviar para GitHub.</div>
+          <span class="card-badge" style="background:#0d2e16;color:#3fb950;">✅ Disponível</span>
+        </a>
+
+        <a class="card" href="playground.html">
+          <div class="card-icon">🎨</div>
+          <div class="card-title">Playground</div>
+          <div class="card-desc">Escreva HTML/CSS/JS e veja o resultado ao vivo. Salve snippets, baixe .html, tela cheia. Ideal para testar códigos.</div>
+          <span class="card-badge" style="background:#0d2e16;color:#3fb950;">✅ Disponível</span>
+        </a>
+
+        <a class="card" href="chat.html">
+          <div class="card-icon">💬</div>
+          <div class="card-title">Chat com IA</div>
+          <div class="card-desc">Converse com Gemini, Groq, OpenAI. TTS com velocidade ajustável, memória automática, histórico salvo.</div>
+          <span class="card-badge" style="background:#0d2e16;color:#3fb950;">✅ Disponível</span>
+        </a>
+
+        <div class="card" onclick="toggleConfig()" style="border-style:dashed;">
+          <div class="card-icon">⚙️</div>
+          <div class="card-title">Configurações</div>
+          <div class="card-desc">Configure Supabase (URL + Key), chaves de IA (Gemini, Groq, OpenAI) e token do GitHub.</div>
+          <span id="cfg-badge" class="card-badge" style="background:#2d1f00;color:#d29922;">⚠ Configurar</span>
+        </div>
+      </div>
+
+      <!-- Painel de configuração -->
+      <div class="cfg-panel" id="cfg-panel" style="display:none;">
+        <h3>⚙️ Configurações</h3>
+
+        <div style="font-size:12px;font-weight:600;color:#8b949e;margin-bottom:8px;">🗄 Supabase (banco de dados na nuvem)</div>
+        <div class="cfg-row">
+          <input type="text" id="sb-url" placeholder="URL do projeto — https://xxx.supabase.co">
+        </div>
+        <div class="cfg-row">
+          <input type="password" id="sb-key" placeholder="Anon/public key — eyJ...">
+          <button class="btn btn-blue" onclick="saveSB()" style="flex-shrink:0;">Salvar</button>
+        </div>
+        <div style="font-size:11px;color:#8b949e;margin-bottom:16px;">
+          Encontre em: <a href="https://supabase.com/dashboard" target="_blank" style="color:#58a6ff;">supabase.com</a> → seu projeto → Settings → API
+        </div>
+
+        <div style="font-size:12px;font-weight:600;color:#8b949e;margin-bottom:8px;">🤖 Chaves de IA</div>
+        <div id="key-list"></div>
+        <div class="cfg-row" style="margin-top:6px;">
+          <input type="text" id="new-key" placeholder="Cole aqui sua chave (AIza... ou gsk_... ou sk-...)">
+          <button class="btn btn-green" onclick="addKey()" style="flex-shrink:0;background:#238636;color:#fff;">+ Adicionar</button>
+        </div>
+        <div style="font-size:11px;color:#8b949e;margin-bottom:16px;">
+          Gemini grátis: <a href="https://aistudio.google.com/apikey" target="_blank" style="color:#58a6ff;">aistudio.google.com</a> &nbsp;·&nbsp;
+          Groq grátis: <a href="https://console.groq.com/keys" target="_blank" style="color:#58a6ff;">console.groq.com</a>
+        </div>
+
+        <div style="font-size:12px;font-weight:600;color:#8b949e;margin-bottom:8px;">🔀 GitHub</div>
+        <div class="cfg-row">
+          <input type="password" id="gh-token" placeholder="Token — ghp_...">
+          <input type="text" id="gh-repo" placeholder="usuario/repositorio">
+          <button class="btn btn-blue" onclick="saveGH()" style="flex-shrink:0;">Salvar</button>
+        </div>
+
+        <div style="margin-top:16px;border-top:1px solid #30363d;padding-top:12px;">
+          <div style="font-size:12px;font-weight:600;color:#8b949e;margin-bottom:8px;">👤 Conta (requer Supabase)</div>
+          <div id="auth-section">
+            <div class="cfg-row">
+              <input type="email" id="auth-email" placeholder="seu@email.com">
+              <input type="password" id="auth-pass" placeholder="senha">
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-blue" onclick="login()">Entrar</button>
+              <button class="btn btn-gray" onclick="register()">Criar conta</button>
+              <button class="btn btn-gray" onclick="resetPass()">Esqueci a senha</button>
+            </div>
+          </div>
+          <div id="auth-msg" style="font-size:12px;margin-top:8px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <span><span class="dot" id="sb-dot" style="background:#8b949e;"></span>Supabase: <span id="sb-status">não configurado</span></span>
+    <span><span class="dot" id="ai-dot" style="background:#8b949e;"></span>IA: <span id="ai-status">não configurada</span></span>
+    <span id="user-status"></span>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+let sb = null;
+
+async function init() {
+  loadConfig();
+  await initSB();
+  checkAI();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+
+function loadConfig() {
+  const url = localStorage.getItem('sb_url') || '';
+  const key = localStorage.getItem('sb_key') || '';
+  if (url) document.getElementById('sb-url').value = url;
+  document.getElementById('gh-repo').value = localStorage.getItem('gh_repo') || '';
+  renderKeys();
+}
+
+async function initSB() {
+  const url = localStorage.getItem('sb_url');
+  const key = localStorage.getItem('sb_key');
+  if (!url || !key) { setSBStatus(false); return; }
+  try {
+    const { createClient: cc } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    sb = cc(url, key);
+    const { data } = await sb.auth.getUser();
+    if (data?.user) {
+      setSBStatus(true);
+      document.getElementById('user-badge').textContent = '👤 ' + data.user.email;
+      document.getElementById('logout-btn').style.display = '';
+      document.getElementById('user-status').textContent = '👤 ' + data.user.email;
+      document.getElementById('cfg-badge').textContent = '✅ Configurado';
+      document.getElementById('cfg-badge').style.cssText = 'background:#0d2e16;color:#3fb950;display:inline-block;font-size:10px;padding:2px 8px;border-radius:4px;margin-top:10px;font-weight:600;';
+    } else {
+      setSBStatus(true, 'conectado (sem login)');
+      document.getElementById('login-btn').style.display = '';
+    }
+  } catch { setSBStatus(false, 'erro de conexão'); }
+}
+
+function setSBStatus(ok, msg) {
+  document.getElementById('sb-dot').style.background = ok ? '#3fb950' : '#f85149';
+  document.getElementById('sb-status').textContent = msg || (ok ? 'conectado' : 'não configurado');
+}
+
+function checkAI() {
+  const keys = JSON.parse(localStorage.getItem('ai_keys') || '[]');
+  const active = keys.find(k=>k.active) || keys[0];
+  if (active?.key) {
+    document.getElementById('ai-dot').style.background = '#3fb950';
+    document.getElementById('ai-status').textContent = detectName(active.key);
+  }
+}
+
+function detectName(key) {
+  if (key.startsWith('AIza'))   return 'Gemini';
+  if (key.startsWith('gsk_'))   return 'Groq';
+  if (key.startsWith('sk-ant-'))return 'Claude';
+  if (key.startsWith('sk-or-')) return 'OpenRouter';
+  if (key.startsWith('sk-'))    return 'OpenAI';
+  return 'IA ativa';
+}
+
+window.toggleConfig = () => {
+  const p = document.getElementById('cfg-panel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+};
+
+window.saveSB = () => {
+  const url = document.getElementById('sb-url').value.trim();
+  const key = document.getElementById('sb-key').value.trim();
+  if (!url || !key) { toast('Preencha URL e Key!', 'err'); return; }
+  localStorage.setItem('sb_url', url);
+  localStorage.setItem('sb_key', key);
+  document.getElementById('sb-key').value = '';
+  toast('✅ Supabase salvo! Recarregando...');
+  setTimeout(() => location.reload(), 1000);
+};
+
+window.saveGH = () => {
+  const t = document.getElementById('gh-token').value.trim();
+  const r = document.getElementById('gh-repo').value.trim();
+  if (t) localStorage.setItem('gh_token', t);
+  if (r) localStorage.setItem('gh_repo', r);
+  document.getElementById('gh-token').value = '';
+  toast('✅ GitHub salvo!');
+};
+
+function renderKeys() {
+  const keys = JSON.parse(localStorage.getItem('ai_keys') || '[]');
+  document.getElementById('key-list').innerHTML = keys.length ? keys.map((k,i) => `
+    <div style="display:flex;align-items:center;gap:6px;background:#0a0e14;border:1px solid #30363d;border-radius:6px;padding:8px;margin-bottom:6px;">
+      <input type="checkbox" ${k.active?'checked':''} onchange="toggleKey(${i})" style="accent-color:#58a6ff;">
+      <span style="font-size:12px;color:${k.active?'#3fb950':'#8b949e'};">${detectName(k.key)}</span>
+      <span style="font-size:11px;color:#8b949e;font-family:monospace;">${k.key.slice(0,12)}...</span>
+      <button onclick="removeKey(${i})" style="margin-left:auto;background:none;border:none;color:#f85149;cursor:pointer;">✕</button>
+    </div>
+  `).join('') : '<p style="font-size:12px;color:#8b949e;margin-bottom:8px;">Nenhuma chave. Adicione abaixo.</p>';
+}
+
+window.addKey = () => {
+  const val = document.getElementById('new-key').value.trim();
+  if (!val) return;
+  const keys = JSON.parse(localStorage.getItem('ai_keys') || '[]');
+  keys.push({ key: val, active: !keys.length });
+  localStorage.setItem('ai_keys', JSON.stringify(keys));
+  document.getElementById('new-key').value = '';
+  renderKeys(); checkAI();
+  toast('✅ Chave adicionada!');
+};
+
+window.toggleKey = (i) => {
+  const keys = JSON.parse(localStorage.getItem('ai_keys') || '[]');
+  keys.forEach((k,j) => k.active = j===i);
+  localStorage.setItem('ai_keys', JSON.stringify(keys));
+  renderKeys(); checkAI();
+};
+
+window.removeKey = (i) => {
+  const keys = JSON.parse(localStorage.getItem('ai_keys') || '[]');
+  keys.splice(i,1);
+  localStorage.setItem('ai_keys', JSON.stringify(keys));
+  renderKeys(); checkAI();
+};
+
+window.login = async () => {
+  if (!sb) { toast('Configure o Supabase primeiro!', 'err'); return; }
+  const email = document.getElementById('auth-email').value.trim();
+  const pass  = document.getElementById('auth-pass').value;
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) { showAuthMsg('Erro: ' + error.message, 'err'); return; }
+  showAuthMsg('✅ Logado!', 'ok');
+  setTimeout(() => location.reload(), 800);
+};
+
+window.register = async () => {
+  if (!sb) { toast('Configure o Supabase primeiro!', 'err'); return; }
+  const email = document.getElementById('auth-email').value.trim();
+  const pass  = document.getElementById('auth-pass').value;
+  const { error } = await sb.auth.signUp({ email, password: pass });
+  if (error) { showAuthMsg('Erro: ' + error.message, 'err'); return; }
+  showAuthMsg('✅ Conta criada! Verifique seu email.', 'ok');
+};
+
+window.resetPass = async () => {
+  if (!sb) { toast('Configure o Supabase primeiro!', 'err'); return; }
+  const email = document.getElementById('auth-email').value.trim();
+  if (!email) { showAuthMsg('Digite seu email primeiro.', 'err'); return; }
+  await sb.auth.resetPasswordForEmail(email);
+  showAuthMsg('✅ Email de recuperação enviado!', 'ok');
+};
+
+window.doLogin = () => { toggleConfig(); document.getElementById('auth-email').focus(); };
+window.doLogout = async () => { if (sb) await sb.auth.signOut(); location.reload(); };
+
+function showAuthMsg(msg, type) {
+  const el = document.getElementById('auth-msg');
+  el.textContent = msg;
+  el.style.color = type === 'err' ? '#f85149' : '#3fb950';
+}
+
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.background = type==='err'?'#da3633':'#238636';
+  t.style.display = 'block'; setTimeout(()=>t.style.display='none',3000);
+}
+
+init();
+</script>
+</body>
+</html>
