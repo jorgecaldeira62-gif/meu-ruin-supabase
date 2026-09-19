@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Playground — MeuIDE</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;height:100dvh;display:flex;flex-direction:column;overflow:hidden;}
+nav{display:flex;align-items:center;gap:8px;padding:0 12px;height:44px;background:#161b22;border-bottom:1px solid #30363d;flex-shrink:0;}
+.nav-title{font-weight:700;font-size:14px;color:#58a6ff;}
+.nav-link{color:#8b949e;font-size:12px;text-decoration:none;padding:4px 8px;border-radius:4px;}
+.nav-link:hover{color:#e6edf3;background:#21262d;}
+.nav-right{margin-left:auto;display:flex;gap:6px;align-items:center;}
+.btn{padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;border:none;cursor:pointer;}
+.btn-blue{background:#1f6feb;color:#fff;}
+.btn-gray{background:#21262d;color:#e6edf3;border:1px solid #30363d;}
+.btn-green{background:#238636;color:#fff;}
+/* Toolbar */
+.toolbar{display:flex;align-items:center;gap:6px;padding:6px 10px;background:#161b22;border-bottom:1px solid #30363d;flex-shrink:0;flex-wrap:wrap;}
+.tab-row{display:flex;border-radius:6px;overflow:hidden;border:1px solid #30363d;}
+.tab-btn{padding:4px 12px;font-size:11px;border:none;background:transparent;color:#8b949e;cursor:pointer;}
+.tab-btn.active{background:#1f6feb;color:#fff;}
+input[type=text]{background:#0a0e14;border:1px solid #30363d;color:#e6edf3;border-radius:6px;padding:5px 10px;font-size:12px;}
+/* Main layout */
+.main{flex:1;display:flex;overflow:hidden;}
+.editor-col{display:flex;flex-direction:column;flex:1;border-right:1px solid #30363d;min-width:0;}
+.preview-col{display:flex;flex-direction:column;flex:1;min-width:0;}
+.col-header{padding:4px 8px;font-size:11px;color:#8b949e;background:#0a0e14;border-bottom:1px solid #30363d;flex-shrink:0;}
+textarea{flex:1;background:#0a0e14;color:#e6edf3;border:none;resize:none;padding:10px;font-family:'Courier New',monospace;font-size:13px;line-height:1.6;outline:none;tab-size:2;}
+iframe{flex:1;border:none;background:#fff;}
+/* Snippets sidebar */
+.snip-sidebar{width:200px;border-left:1px solid #30363d;display:flex;flex-direction:column;background:#161b22;}
+.snip-sidebar.hidden{display:none;}
+.snip-item{padding:7px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #21262d;display:flex;justify-content:space-between;align-items:center;}
+.snip-item:hover{background:#1c2128;}
+#toast{position:fixed;bottom:20px;right:20px;padding:8px 16px;border-radius:6px;font-size:13px;color:#fff;display:none;z-index:99;}
+/* Preview resizable */
+.preview-col.expanded{flex:2;}
+</style>
+</head>
+<body>
+<nav>
+  <span class="nav-title">🎨 Playground</span>
+  <a class="nav-link" href="editor.html">Editor</a>
+  <a class="nav-link" href="chat.html">Chat IA</a>
+  <div class="nav-right">
+    <button class="btn btn-gray" onclick="toggleSnippets()">📂 Salvos</button>
+    <button class="btn btn-gray" onclick="logout()">Sair</button>
+  </div>
+</nav>
+
+<div class="toolbar">
+  <div class="tab-row">
+    <button class="tab-btn active" id="tab-html" onclick="setTab('html')">HTML</button>
+    <button class="tab-btn" id="tab-css" onclick="setTab('css')">CSS</button>
+    <button class="tab-btn" id="tab-js" onclick="setTab('js')">JS</button>
+  </div>
+  <input type="text" id="snip-title" placeholder="Nome do snippet..." style="width:160px;">
+  <button class="btn btn-blue" onclick="run()">▶ Run</button>
+  <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;">
+    <input type="checkbox" id="auto-run" checked style="accent-color:#58a6ff;"> Auto
+  </label>
+  <button class="btn btn-green" onclick="save()">💾 Salvar</button>
+  <button class="btn btn-gray" onclick="download()">⬇ .html</button>
+  <button class="btn btn-gray" onclick="openFullscreen()">⛶ Tela cheia</button>
+  <button class="btn btn-gray" onclick="togglePreviewSize()">↔ Preview</button>
+</div>
+
+<div class="main">
+  <div class="editor-col">
+    <div class="col-header" id="editor-label">✏️ HTML</div>
+    <textarea id="editor" spellcheck="false" oninput="onEdit()" onkeydown="handleTab(event)" placeholder="Digite seu código aqui..."></textarea>
+  </div>
+
+  <div class="preview-col" id="preview-col">
+    <div class="col-header">👁 Preview ao vivo</div>
+    <iframe id="preview" sandbox="allow-scripts allow-modals allow-forms allow-popups"></iframe>
+  </div>
+
+  <div class="snip-sidebar hidden" id="snip-sidebar">
+    <div style="padding:8px;border-bottom:1px solid #30363d;font-size:12px;font-weight:600;">Snippets salvos</div>
+    <div id="snip-list" style="flex:1;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+const sbUrl = localStorage.getItem('sb_url');
+const sbKey = localStorage.getItem('sb_key');
+let sb = null;
+if (sbUrl && sbKey) sb = createClient(sbUrl, sbKey);
+
+let user = null;
+let timer = null;
+let currentTab = 'html';
+let code = { html: `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: sans-serif; padding: 20px; background: #f0f4f8; }
+  h1 { color: #2563eb; }
+  button { background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 15px; cursor: pointer; margin-top: 12px; }
+</style>
+</head>
+<body>
+  <h1>🚀 Playground</h1>
+  <p>Edite o código e veja ao vivo!</p>
+  <button onclick="alert('Funcionou! ✅')">Testar</button>
+</body>
+</html>`, css: '', js: '' };
+let snippets = [];
+
+async function init() {
+  if (sb) {
+    const { data } = await sb.auth.getUser();
+    user = data?.user || null;
+  }
+  document.getElementById('editor').value = code.html;
+  run();
+  if (sb && user) await loadSnippets();
+}
+
+// ── Tabs ──────────────────────────────────────────────
+window.setTab = (tab) => {
+  code[currentTab] = document.getElementById('editor').value;
+  currentTab = tab;
+  const labels = { html: '✏️ HTML', css: '🎨 CSS', js: '📜 JavaScript' };
+  document.getElementById('editor-label').textContent = labels[tab];
+  document.getElementById('editor').value = code[tab];
+  ['html','css','js'].forEach(t => document.getElementById('tab-'+t).classList.toggle('active', t===tab));
+};
+
+// ── Preview ───────────────────────────────────────────
+function buildDoc() {
+  const h = code.html.trim().toLowerCase();
+  if (h.includes('<!doctype') || h.includes('<html')) return code.html;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${code.css}</style></head><body>${code.html}<script>${code.js}<\/script></html>`;
+}
+
+window.run = () => {
+  code[currentTab] = document.getElementById('editor').value;
+  const doc = buildDoc();
+  const blob = new Blob([doc], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const frame = document.getElementById('preview');
+  if (frame._prev) URL.revokeObjectURL(frame._prev);
+  frame._prev = url;
+  frame.src = url;
+};
+
+window.onEdit = () => {
+  if (!document.getElementById('auto-run').checked) return;
+  clearTimeout(timer);
+  timer = setTimeout(run, 600);
+};
+
+window.handleTab = (e) => {
+  if (e.key !== 'Tab') return;
+  e.preventDefault();
+  const t = e.target, s = t.selectionStart;
+  t.value = t.value.substring(0,s) + '  ' + t.value.substring(t.selectionEnd);
+  t.selectionStart = t.selectionEnd = s + 2;
+  onEdit();
+};
+
+window.download = () => {
+  code[currentTab] = document.getElementById('editor').value;
+  const title = document.getElementById('snip-title').value || 'playground';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([buildDoc()], { type: 'text/html' }));
+  a.download = title + '.html'; a.click();
+};
+
+window.openFullscreen = () => {
+  code[currentTab] = document.getElementById('editor').value;
+  window.open(URL.createObjectURL(new Blob([buildDoc()], { type: 'text/html;charset=utf-8' })), '_blank');
+};
+
+window.togglePreviewSize = () => {
+  document.getElementById('preview-col').classList.toggle('expanded');
+};
+
+// ── Snippets ──────────────────────────────────────────
+window.save = async () => {
+  code[currentTab] = document.getElementById('editor').value;
+  const title = document.getElementById('snip-title').value.trim() || 'Sem título';
+
+  if (sb && user) {
+    const { error } = await sb.from('snippets').insert({
+      user_id: user.id, title, html: code.html, css: code.css, js: code.js
+    });
+    if (error) { toast('Erro: ' + error.message, 'err'); return; }
+    toast('✅ Salvo no Supabase!');
+    await loadSnippets();
+  } else {
+    const local = JSON.parse(localStorage.getItem('snippets') || '[]');
+    local.push({ id: Date.now(), title, html: code.html, css: code.css, js: code.js, date: new Date().toISOString() });
+    localStorage.setItem('snippets', JSON.stringify(local));
+    toast('✅ Salvo localmente!');
+    renderSnippets(local);
+  }
+};
+
+async function loadSnippets() {
+  if (!sb || !user) {
+    const local = JSON.parse(localStorage.getItem('snippets') || '[]');
+    renderSnippets(local); return;
+  }
+  const { data } = await sb.from('snippets').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+  snippets = data || [];
+  renderSnippets(snippets);
+}
+
+function renderSnippets(list) {
+  document.getElementById('snip-list').innerHTML = list.length
+    ? list.map(s => `
+        <div class="snip-item" onclick="loadSnippet(${JSON.stringify(s).replace(/"/g,'&quot;')})">
+          <div>
+            <div style="color:#e6edf3;">${esc(s.title)}</div>
+            <div style="font-size:10px;color:#8b949e;">${s.date ? new Date(s.date).toLocaleDateString('pt-BR') : ''}</div>
+          </div>
+          <button onclick="event.stopPropagation();deleteSnippet('${s.id}')" style="background:none;border:none;color:#f85149;cursor:pointer;font-size:14px;">✕</button>
+        </div>`)
+        .join('')
+    : '<p style="padding:12px;font-size:12px;color:#8b949e;">Nenhum snippet salvo.</p>';
+}
+
+window.loadSnippet = (s) => {
+  code.html = s.html || ''; code.css = s.css || ''; code.js = s.js || '';
+  document.getElementById('snip-title').value = s.title || '';
+  document.getElementById('editor').value = code[currentTab];
+  run();
+};
+
+window.deleteSnippet = async (id) => {
+  if (!confirm('Deletar snippet?')) return;
+  if (sb && user) {
+    await sb.from('snippets').delete().eq('id', id);
+    await loadSnippets();
+  } else {
+    const local = JSON.parse(localStorage.getItem('snippets') || '[]').filter(s => String(s.id) !== String(id));
+    localStorage.setItem('snippets', JSON.stringify(local));
+    renderSnippets(local);
+  }
+  toast('Deletado');
+};
+
+window.toggleSnippets = () => {
+  const s = document.getElementById('snip-sidebar');
+  s.classList.toggle('hidden');
+  if (!s.classList.contains('hidden')) loadSnippets();
+};
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.background = type==='err'?'#da3633':'#238636';
+  t.style.display = 'block'; setTimeout(()=>t.style.display='none',3000);
+}
+
+window.logout = async () => { if (sb) await sb.auth.signOut(); window.location.href = 'index.html'; };
+
+init();
+</script>
+</body>
+</html>
